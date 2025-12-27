@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>题库刷题系统</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- 侧边栏导航 -->
+        <nav class="sidebar">
+            <div class="logo">
+                <i class="fas fa-book-open"></i>
+                <span>题库刷题系统</span>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-page="dashboard">
+                    <i class="fas fa-home"></i>
+                    <span>首页</span>
+                </li>
+                <li class="nav-item" data-page="import">
+                    <i class="fas fa-upload"></i>
+                    <span>导入题库</span>
+                </li>
+                <li class="nav-item" data-page="manage">
+                    <i class="fas fa-database"></i>
+                    <span>题库管理</span>
+                </li>
+                <li class="nav-item" data-page="practice">
+                    <i class="fas fa-pen"></i>
+                    <span>开始刷题</span>
+                </li>
+                <li class="nav-item" data-page="settings">
+                    <i class="fas fa-cog"></i>
+                    <span>系统设置</span>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 首页 -->
+            <div id="dashboard-page" class="page active">
+                <h1>欢迎使用题库刷题系统</h1>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-database"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="total-banks">0</span>
+                            <span class="stat-label">题库数量</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="total-questions">0</span>
+                            <span class="stat-label">题目总数</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="single-count">0</span>
+                            <span class="stat-label">单选题</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-list"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="multi-count">0</span>
+                            <span class="stat-label">多选题</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <h2>快速开始</h2>
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" onclick="switchPage('import')">
+                            <i class="fas fa-upload"></i> 导入题库
+                        </button>
+                        <button class="btn btn-success" onclick="switchPage('practice')">
+                            <i class="fas fa-pen"></i> 开始刷题
+                        </button>
+                    </div>
+                </div>
+
+                <div class="chapter-stats" id="chapter-stats">
+                    <h2>章节分布</h2>
+                    <div class="chapter-list" id="chapter-list"></div>
+                </div>
+            </div>
+
+            <!-- 导入题库页 -->
+            <div id="import-page" class="page">
+                <h1>导入题库</h1>
+                <div class="import-section">
+                    <div class="upload-area" id="upload-area">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>拖拽文件到此处或点击上传</p>
+                        <p class="hint">支持 .doc 和 .docx 格式</p>
+                        <input type="file" id="file-input" accept=".doc,.docx" hidden>
+                    </div>
+
+                    <div class="import-form">
+                        <div class="form-group">
+                            <label for="bank-name">题库名称（可选）</label>
+                            <input type="text" id="bank-name" placeholder="留空则使用文件名">
+                        </div>
+                        <div class="selected-file" id="selected-file" style="display: none;">
+                            <i class="fas fa-file-word"></i>
+                            <span id="file-name"></span>
+                            <button class="btn-icon" onclick="clearFile()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <button class="btn btn-primary btn-block" id="import-btn" onclick="importFile()" disabled>
+                            <i class="fas fa-upload"></i> 开始导入
+                        </button>
+                    </div>
+
+                    <div class="import-progress" id="import-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <p class="progress-text">正在导入...</p>
+                    </div>
+
+                    <div class="import-result" id="import-result" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- 题库管理页 -->
+            <div id="manage-page" class="page">
+                <h1>题库管理</h1>
+                <div class="manage-section">
+                    <div class="bank-list" id="bank-list">
+                        <!-- 题库列表将通过JS动态生成 -->
+                    </div>
+
+                    <div class="question-browser" id="question-browser" style="display: none;">
+                        <div class="browser-header">
+                            <button class="btn btn-secondary" onclick="showBankList()">
+                                <i class="fas fa-arrow-left"></i> 返回
+                            </button>
+                            <h2 id="current-bank-name"></h2>
+                        </div>
+                        <div class="filter-bar">
+                            <select id="filter-type">
+                                <option value="">全部类型</option>
+                                <option value="single">单选题</option>
+                                <option value="multi">多选题</option>
+                            </select>
+                            <select id="filter-chapter">
+                                <option value="">全部章节</option>
+                            </select>
+                        </div>
+                        <div class="question-list" id="question-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 刷题页 -->
+            <div id="practice-page" class="page">
+                <h1>刷题练习</h1>
+
+                <!-- 刷题设置 -->
+                <div class="practice-settings" id="practice-settings">
+                    <div class="settings-card">
+                        <h3>选择题库</h3>
+                        <select id="practice-bank" class="form-control">
+                            <option value="">全部题库</option>
+                        </select>
+                    </div>
+                    <div class="settings-card">
+                        <h3>选择题型</h3>
+                        <select id="practice-type" class="form-control">
+                            <option value="">全部题型</option>
+                            <option value="single">单选题</option>
+                            <option value="multi">多选题</option>
+                        </select>
+                    </div>
+                    <div class="settings-card">
+                        <h3>题目数量</h3>
+                        <input type="number" id="practice-count" class="form-control" value="10" min="1" max="100">
+                    </div>
+                    <button class="btn btn-primary btn-large" onclick="startPractice()">
+                        <i class="fas fa-play"></i> 开始刷题
+                    </button>
+                </div>
+
+                <!-- 刷题界面 -->
+                <div class="practice-area" id="practice-area" style="display: none;">
+                    <div class="practice-header">
+                        <div class="progress-info">
+                            <span>题目进度: <strong id="current-index">1</strong> / <strong
+                                    id="total-count">10</strong></span>
+                        </div>
+                        <div class="score-info">
+                            <span class="correct-count"><i class="fas fa-check"></i> <span
+                                    id="correct-num">0</span></span>
+                            <span class="wrong-count"><i class="fas fa-times"></i> <span id="wrong-num">0</span></span>
+                        </div>
+                    </div>
+
+                    <div class="question-card" id="question-card">
+                        <div class="question-header">
+                            <span class="question-type" id="question-type">单选题</span>
+                            <span class="question-chapter" id="question-chapter">第一章</span>
+                        </div>
+                        <div class="question-content" id="question-content"></div>
+                        <div class="options-list" id="options-list"></div>
+                        <div class="answer-result" id="answer-result" style="display: none;"></div>
+                    </div>
+
+                    <div class="practice-actions">
+                        <button class="btn btn-secondary" id="prev-btn" onclick="prevQuestion()" disabled>
+                            <i class="fas fa-arrow-left"></i> 上一题
+                        </button>
+                        <button class="btn btn-primary" id="submit-btn" onclick="submitAnswer()">
+                            提交答案
+                        </button>
+                        <button class="btn btn-success" id="next-btn" onclick="nextQuestion()" style="display: none;">
+                            下一题 <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 练习结果 -->
+                <div class="practice-result" id="practice-result" style="display: none;">
+                    <h2>练习完成!</h2>
+                    <div class="result-stats">
+                        <div class="result-item">
+                            <span class="result-label">总题数</span>
+                            <span class="result-value" id="result-total">0</span>
+                        </div>
+                        <div class="result-item correct">
+                            <span class="result-label">正确</span>
+                            <span class="result-value" id="result-correct">0</span>
+                        </div>
+                        <div class="result-item wrong">
+                            <span class="result-label">错误</span>
+                            <span class="result-value" id="result-wrong">0</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">正确率</span>
+                            <span class="result-value" id="result-rate">0%</span>
+                        </div>
+                    </div>
+                    <div class="result-actions">
+                        <button class="btn btn-primary" onclick="startPractice()">
+                            <i class="fas fa-redo"></i> 再来一次
+                        </button>
+                        <button class="btn btn-secondary" onclick="showPracticeSettings()">
+                            <i class="fas fa-cog"></i> 重新设置
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 设置页 -->
+            <div id="settings-page" class="page">
+                <h1>系统设置</h1>
+                <div class="settings-section">
+                    <div class="setting-item">
+                        <h3>数据存储路径</h3>
+                        <p class="setting-desc">题库数据将保存在此目录下</p>
+                        <div class="setting-control">
+                            <input type="text" id="data-path" class="form-control" placeholder="数据存储路径">
+                            <button class="btn btn-secondary" onclick="browseDataPath()">
+                                <i class="fas fa-folder-open"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <h3>当前数据文件</h3>
+                        <p class="setting-desc" id="current-data-file">-</p>
+                    </div>
+                    <div class="setting-actions">
+                        <button class="btn btn-primary" onclick="saveSettings()">
+                            <i class="fas fa-save"></i> 保存设置
+                        </button>
+                        <button class="btn btn-danger" onclick="clearAllData()">
+                            <i class="fas fa-trash"></i> 清空所有数据
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 通知提示 -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- 确认对话框 -->
+    <div class="modal" id="confirm-modal">
+        <div class="modal-content">
+            <h3 id="confirm-title">确认</h3>
+            <p id="confirm-message">确定要执行此操作吗？</p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+                <button class="btn btn-danger" id="confirm-btn">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 题目编辑对话框 -->
+    <div class="modal" id="edit-modal">
+        <div class="modal-content modal-large">
+            <h3>编辑题目</h3>
+            <div class="edit-form">
+                <div class="form-group">
+                    <label>题目内容</label>
+                    <textarea id="edit-question" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>题目类型</label>
+                    <select id="edit-type">
+                        <option value="single">单选题</option>
+                        <option value="multi">多选题</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>选项</label>
+                    <div id="edit-options"></div>
+                </div>
+                <div class="form-group">
+                    <label>正确答案</label>
+                    <input type="text" id="edit-answer" placeholder="例如: A 或 ABC">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeEditModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveQuestion()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+
+</html>
