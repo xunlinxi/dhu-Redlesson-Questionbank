@@ -1,4 +1,4 @@
-# 题库刷题系统
+# dhu红课题库刷题系统
 
 一个基于 Web 的题库导入与刷题系统，支持从 Word 文档（.doc/.docx）导入题目，并提供在线刷题功能。
 
@@ -13,22 +13,36 @@
 
 ## 项目结构
 
-```
-炸红题库/
-├── backend/
-│   ├── app.py              # Flask 后端主程序
-│   ├── parser.py           # 题目解析器
-│   └── requirements.txt    # Python 依赖
-├── frontend/
-│   ├── index.html          # 主页面
-│   ├── css/
-│   │   └── style.css       # 样式文件
-│   └── js/
-│       └── app.js          # 前端逻辑
-├── data/
-│   └── questions.json      # 题库数据（自动生成）
-├── config.json             # 配置文件
-└── README.md               # 说明文档
+```mermaid
+graph LR
+    subgraph 炸红题库
+        README[README.md<br/>说明文档]
+        CONFIG[config.json<br/>配置文件]
+        
+        subgraph backend[backend/]
+            APP[app.py<br/>Flask 后端主程序]
+            PARSER[parser.py<br/>题目解析器]
+            REQ[requirements.txt<br/>Python 依赖]
+        end
+        
+        subgraph frontend[frontend/]
+            HTML[index.html<br/>主页面]
+            subgraph css[css/]
+                STYLE[style.css<br/>样式文件]
+            end
+            subgraph js[js/]
+                APPJS[app.js<br/>前端逻辑]
+            end
+        end
+        
+        subgraph data[data/]
+            JSON[questions.json<br/>题库数据 - 自动生成]
+        end
+    end
+    
+    style backend fill:#e1f5fe
+    style frontend fill:#fff3e0
+    style data fill:#e8f5e9
 ```
 
 ## 快速开始
