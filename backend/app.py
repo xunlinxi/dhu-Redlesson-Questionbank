@@ -80,6 +80,18 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+# ==================== 健康检查API ====================
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """健康检查接口"""
+    return jsonify({
+        "success": True,
+        "status": "online",
+        "message": "服务正常运行"
+    })
+
+
 # ==================== 静态文件服务 ====================
 
 @app.route('/')
@@ -194,20 +206,30 @@ def import_questions():
         }), 400
     
     try:
-        # 保存上传的文件
-        filename = secure_filename(file.filename)
-        # 处理中文文件名
-        if not filename or filename == '':
-            filename = file.filename
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        # 保存上传的文件 - 使用原始文件名（保留中文）
+        # secure_filename会去掉中文字符，所以我们需要特殊处理
+        import unicodedata
+        import re as regex
+        
+        original_filename = file.filename
+        # 清理文件名中的特殊字符，但保留中文
+        safe_filename = unicodedata.normalize('NFKC', original_filename)
+        safe_filename = regex.sub(r'[<>:"/\\|?*]', '_', safe_filename)
+        
+        # 如果文件名为空或只有扩展名，使用时间戳
+        if not safe_filename or safe_filename.startswith('.'):
+            from datetime import datetime
+            safe_filename = f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}{os.path.splitext(original_filename)[1]}"
+        
+        file_path = os.path.join(UPLOAD_FOLDER, safe_filename)
         file.save(file_path)
         
-        # 如果没有指定题库名称，使用文件名
-        if not bank_name:
-            bank_name = os.path.splitext(filename)[0]
+        # 解析题目（parse_file现在返回元组：questions, extracted_name）
+        questions, extracted_name = parse_file(file_path, bank_name if bank_name else None)
         
-        # 解析题目
-        questions = parse_file(file_path, bank_name)
+        # 如果没有指定题库名称，使用提取的名称
+        if not bank_name:
+            bank_name = extracted_name
         
         if not questions:
             return jsonify({
@@ -221,7 +243,7 @@ def import_questions():
         # 添加题库信息
         from datetime import datetime
         data['banks'][bank_name] = {
-            "source_file": filename,
+            "source_file": original_filename,
             "import_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         
@@ -341,7 +363,15 @@ def delete_question(question_id):
 
 @app.route('/api/practice/random', methods=['GET'])
 def get_random_questions():
-    """获取随机题目用于刷题"""
+    """获取随机题目用于刷题
+    
+    支持参数：
+    - bank: 题库名称
+    - type: 题型(single/multi)
+    - count: 总题目数量
+    - single_count: 单选题数量
+    - multi_count: 多选题数量
+    """
     data = load_questions()
     questions = data.get('questions', [])
     
@@ -350,7 +380,41 @@ def get_random_questions():
     if bank:
         questions = [q for q in questions if q.get('bank') == bank]
     
-    # 支持按类型筛选
+    # 分离单选和多选题
+    single_questions = [q for q in questions if q.get('type') == 'single']
+    multi_questions = [q for q in questions if q.get('type') == 'multi']
+    
+    # 检查是否指定了单选和多选数量
+    single_count = request.args.get('single_count', '')
+    multi_count = request.args.get('multi_count', '')
+    
+    if single_count or multi_count:
+        # 按指定数量获取
+        single_count = int(single_count) if single_count else 0
+        multi_count = int(multi_count) if multi_count else 0
+        
+        selected = []
+        
+        # 获取单选题
+        if single_count > 0:
+            single_count = min(single_count, len(single_questions))
+            selected.extend(random.sample(single_questions, single_count))
+        
+        # 获取多选题
+        if multi_count > 0:
+            multi_count = min(multi_count, len(multi_questions))
+            selected.extend(random.sample(multi_questions, multi_count))
+        
+        # 打乱顺序
+        random.shuffle(selected)
+        
+        return jsonify({
+            "success": True,
+            "questions": selected,
+            "total": len(selected)
+        })
+    
+    # 原有逻辑：按类型筛选
     q_type = request.args.get('type', '')
     if q_type:
         questions = [q for q in questions if q.get('type') == q_type]
@@ -362,9 +426,6 @@ def get_random_questions():
     # 随机选择题目
     if questions:
         selected = random.sample(questions, count)
-        # 隐藏答案，刷题时需要通过check接口验证
-        for q in selected:
-            q = q.copy()
         return jsonify({
             "success": True,
             "questions": selected,
@@ -422,8 +483,9 @@ def get_stats():
     single_count = len([q for q in questions if q.get('type') == 'single'])
     multi_count = len([q for q in questions if q.get('type') == 'multi'])
     
-    # 统计各章节题目数量
-    chapters = {}
+    # 统计各章节题目数量（保持原始顺序）
+    from collections import OrderedDict
+    chapters = OrderedDict()
     for q in questions:
         chapter = q.get('chapter', '未分类')
         chapters[chapter] = chapters.get(chapter, 0) + 1
@@ -435,14 +497,14 @@ def get_stats():
             "total_banks": len(banks),
             "single_choice_count": single_count,
             "multi_choice_count": multi_count,
-            "chapters": chapters
+            "chapters": dict(chapters)
         }
     })
 
 
 @app.route('/api/chapters', methods=['GET'])
 def get_chapters():
-    """获取所有章节列表"""
+    """获取所有章节列表（保持原始顺序）"""
     data = load_questions()
     questions = data.get('questions', [])
     
@@ -451,10 +513,98 @@ def get_chapters():
     if bank:
         questions = [q for q in questions if q.get('bank') == bank]
     
-    chapters = list(set(q.get('chapter', '未分类') for q in questions))
+    # 保持章节的原始顺序（按第一次出现的顺序）
+    seen = set()
+    chapters = []
+    for q in questions:
+        chapter = q.get('chapter', '未分类')
+        if chapter not in seen:
+            seen.add(chapter)
+            chapters.append(chapter)
+    
     return jsonify({
         "success": True,
         "chapters": chapters
+    })
+
+
+# ==================== 排名相关API ====================
+
+def get_rankings_file_path():
+    """获取排名文件路径"""
+    config = load_config()
+    data_path = config.get('data_path', os.path.join(BASE_DIR, 'data'))
+    os.makedirs(data_path, exist_ok=True)
+    return os.path.join(data_path, 'rankings.json')
+
+
+def load_rankings():
+    """加载排名数据"""
+    file_path = get_rankings_file_path()
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {"rankings": []}
+
+
+def save_rankings(data):
+    """保存排名数据"""
+    file_path = get_rankings_file_path()
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+@app.route('/api/rankings', methods=['GET'])
+def get_rankings():
+    """获取排名列表"""
+    data = load_rankings()
+    rankings = data.get('rankings', [])
+    # 按正确率和用时排序（正确率高优先，用时短优先）
+    rankings.sort(key=lambda x: (-x.get('accuracy', 0), x.get('time_spent', 9999)))
+    return jsonify({
+        "success": True,
+        "rankings": rankings[:20]  # 只返回前20名
+    })
+
+
+@app.route('/api/rankings', methods=['POST'])
+def add_ranking():
+    """添加排名记录"""
+    req_data = request.json
+    
+    from datetime import datetime
+    
+    record = {
+        "id": str(abs(hash(str(datetime.now())))),
+        "name": req_data.get('name', '匿名'),
+        "total": req_data.get('total', 0),
+        "correct": req_data.get('correct', 0),
+        "wrong": req_data.get('wrong', 0),
+        "accuracy": req_data.get('accuracy', 0),
+        "time_spent": req_data.get('time_spent', 0),  # 秒
+        "time_display": req_data.get('time_display', ''),
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M")
+    }
+    
+    data = load_rankings()
+    data['rankings'].append(record)
+    save_rankings(data)
+    
+    return jsonify({
+        "success": True,
+        "message": "成绩已记录",
+        "record": record
+    })
+
+
+@app.route('/api/rankings', methods=['DELETE'])
+def clear_rankings():
+    """清空排名记录"""
+    save_rankings({"rankings": []})
+    return jsonify({
+        "success": True,
+        "message": "排名记录已清空"
     })
 
 

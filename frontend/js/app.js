@@ -13,6 +13,11 @@ let correctCount = 0;
 let wrongCount = 0;
 let currentBankName = '';
 let editingQuestionId = null;
+let serverOnline = true;
+let healthCheckInterval = null;
+let practiceTimer = null;
+let remainingTime = 0;
+let practiceStartTime = null;
 
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', function() {
@@ -20,7 +25,80 @@ document.addEventListener('DOMContentLoaded', function() {
     initUpload();
     loadStats();
     loadConfig();
+    startHealthCheck();
 });
+
+// ==================== 服务器健康检查 ====================
+function startHealthCheck() {
+    // 每3秒检查一次服务器状态
+    healthCheckInterval = setInterval(checkServerHealth, 3000);
+    // 立即检查一次
+    checkServerHealth();
+}
+
+async function checkServerHealth() {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        
+        const response = await fetch(`${API_BASE}/api/health`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+            if (!serverOnline) {
+                serverOnline = true;
+                hideServerError();
+                showToast('服务器连接已恢复', 'success');
+                // 重新加载当前页面数据
+                switchPage(currentPage);
+            }
+        } else {
+            handleServerOffline();
+        }
+    } catch (error) {
+        handleServerOffline();
+    }
+}
+
+function handleServerOffline() {
+    if (serverOnline) {
+        serverOnline = false;
+        showServerError();
+        showToast('服务器连接已断开，请检查后端服务是否运行', 'error');
+        
+        // 如果正在刷题，暂停计时器
+        if (practiceTimer) {
+            clearInterval(practiceTimer);
+            practiceTimer = null;
+            showToast('答题计时已暂停', 'warning');
+        }
+    }
+}
+
+function showServerError() {
+    let errorBanner = document.getElementById('server-error-banner');
+    if (!errorBanner) {
+        errorBanner = document.createElement('div');
+        errorBanner.id = 'server-error-banner';
+        errorBanner.className = 'server-error-banner';
+        errorBanner.innerHTML = `
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>服务器连接已断开，请确保后端服务正在运行</span>
+            <button onclick="checkServerHealth()" class="btn btn-small">重试连接</button>
+        `;
+        document.body.insertBefore(errorBanner, document.body.firstChild);
+    }
+    errorBanner.style.display = 'flex';
+}
+
+function hideServerError() {
+    const errorBanner = document.getElementById('server-error-banner');
+    if (errorBanner) {
+        errorBanner.style.display = 'none';
+    }
+}
 
 // ==================== 导航 ====================
 function initNavigation() {
@@ -57,6 +135,7 @@ function switchPage(page) {
         case 'practice':
             loadPracticeOptions();
             showPracticeSettings();
+            loadRankings();
             break;
         case 'settings':
             loadConfig();
@@ -492,8 +571,78 @@ async function loadPracticeOptions() {
                 select.innerHTML += `<option value="${bank.name}">${bank.name} (${bank.question_count}题)</option>`;
             });
         }
+        
+        // 绑定题库选择事件
+        select.onchange = () => {
+            loadPracticeChapters();
+            updateAvailableStats();
+        };
+        
+        // 初始加载统计
+        updateAvailableStats();
     } catch (error) {
         console.error('加载题库选项失败:', error);
+    }
+}
+
+async function loadPracticeChapters() {
+    const bank = document.getElementById('practice-bank').value;
+    const select = document.getElementById('practice-chapter');
+    select.innerHTML = '<option value="">全部章节</option>';
+    
+    if (bank) {
+        try {
+            const response = await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bank)}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                data.chapters.forEach(chapter => {
+                    select.innerHTML += `<option value="${chapter}">${chapter}</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('加载章节失败:', error);
+        }
+    }
+    
+    select.onchange = updateAvailableStats;
+}
+
+async function updateAvailableStats() {
+    const bank = document.getElementById('practice-bank').value;
+    const chapter = document.getElementById('practice-chapter')?.value || '';
+    
+    let url = `${API_BASE}/api/stats`;
+    if (bank) {
+        url += `?bank=${encodeURIComponent(bank)}`;
+        if (chapter) {
+            url += `&chapter=${encodeURIComponent(chapter)}`;
+        }
+    }
+    
+    try {
+        // 获取题目统计
+        let singleCount = 0;
+        let multiCount = 0;
+        
+        let questionsUrl = `${API_BASE}/api/questions?`;
+        if (bank) questionsUrl += `bank=${encodeURIComponent(bank)}&`;
+        if (chapter) questionsUrl += `chapter=${encodeURIComponent(chapter)}&`;
+        
+        const response = await fetch(questionsUrl);
+        const data = await response.json();
+        
+        if (data.success) {
+            data.questions.forEach(q => {
+                if (q.type === 'single') singleCount++;
+                else multiCount++;
+            });
+        }
+        
+        document.getElementById('available-single').textContent = singleCount;
+        document.getElementById('available-multi').textContent = multiCount;
+    } catch (error) {
+        console.error('更新统计失败:', error);
     }
 }
 
@@ -501,16 +650,30 @@ function showPracticeSettings() {
     document.getElementById('practice-settings').style.display = 'grid';
     document.getElementById('practice-area').style.display = 'none';
     document.getElementById('practice-result').style.display = 'none';
+    
+    // 停止计时器
+    if (practiceTimer) {
+        clearInterval(practiceTimer);
+        practiceTimer = null;
+    }
 }
 
 async function startPractice() {
     const bank = document.getElementById('practice-bank').value;
-    const type = document.getElementById('practice-type').value;
-    const count = parseInt(document.getElementById('practice-count').value) || 10;
+    const chapter = document.getElementById('practice-chapter')?.value || '';
+    const singleCount = parseInt(document.getElementById('practice-single-count').value) || 0;
+    const multiCount = parseInt(document.getElementById('practice-multi-count').value) || 0;
+    const enableTimer = document.getElementById('enable-timer').checked;
+    const timeMinutes = parseInt(document.getElementById('practice-time').value) || 35;
     
-    let url = `${API_BASE}/api/practice/random?count=${count}`;
+    if (singleCount === 0 && multiCount === 0) {
+        showToast('请至少设置一种题型的数量', 'warning');
+        return;
+    }
+    
+    let url = `${API_BASE}/api/practice/random?single_count=${singleCount}&multi_count=${multiCount}`;
     if (bank) url += `&bank=${encodeURIComponent(bank)}`;
-    if (type) url += `&type=${type}`;
+    if (chapter) url += `&chapter=${encodeURIComponent(chapter)}`;
     
     try {
         const response = await fetch(url);
@@ -522,17 +685,55 @@ async function startPractice() {
             correctCount = 0;
             wrongCount = 0;
             selectedAnswers = [];
+            practiceStartTime = new Date();
             
             document.getElementById('practice-settings').style.display = 'none';
             document.getElementById('practice-area').style.display = 'block';
             document.getElementById('practice-result').style.display = 'none';
             
+            // 设置计时器
+            if (enableTimer) {
+                remainingTime = timeMinutes * 60;
+                document.getElementById('timer-display').style.display = 'flex';
+                updateTimerDisplay();
+                practiceTimer = setInterval(updateTimer, 1000);
+            } else {
+                document.getElementById('timer-display').style.display = 'none';
+            }
+            
             renderQuestion();
         } else {
-            showToast('没有找到题目，请先导入题库', 'warning');
+            showToast('没有找到符合条件的题目，请调整设置', 'warning');
         }
     } catch (error) {
         showToast('加载题目失败: ' + error.message, 'error');
+    }
+}
+
+function updateTimer() {
+    remainingTime--;
+    updateTimerDisplay();
+    
+    if (remainingTime <= 0) {
+        clearInterval(practiceTimer);
+        practiceTimer = null;
+        showToast('时间到！', 'warning');
+        showPracticeResult();
+    }
+}
+
+function updateTimerDisplay() {
+    const minutes = Math.floor(remainingTime / 60);
+    const seconds = remainingTime % 60;
+    const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    document.getElementById('timer-text').textContent = display;
+    
+    // 时间不足5分钟时变红
+    const timerDisplay = document.getElementById('timer-display');
+    if (remainingTime <= 300) {
+        timerDisplay.classList.add('warning');
+    } else {
+        timerDisplay.classList.remove('warning');
     }
 }
 
@@ -673,6 +874,19 @@ function nextQuestion() {
 }
 
 function showPracticeResult() {
+    // 停止计时器
+    if (practiceTimer) {
+        clearInterval(practiceTimer);
+        practiceTimer = null;
+    }
+    
+    // 计算用时
+    const endTime = new Date();
+    const timeSpent = Math.floor((endTime - practiceStartTime) / 1000); // 秒
+    const minutes = Math.floor(timeSpent / 60);
+    const seconds = timeSpent % 60;
+    const timeDisplay = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    
     document.getElementById('practice-area').style.display = 'none';
     document.getElementById('practice-result').style.display = 'block';
     
@@ -683,6 +897,19 @@ function showPracticeResult() {
     document.getElementById('result-correct').textContent = correctCount;
     document.getElementById('result-wrong').textContent = wrongCount;
     document.getElementById('result-rate').textContent = rate + '%';
+    document.getElementById('result-time').textContent = timeDisplay;
+    
+    // 保存成绩到排名
+    const playerName = document.getElementById('player-name')?.value?.trim() || '匿名';
+    saveRanking({
+        name: playerName,
+        total: total,
+        correct: correctCount,
+        wrong: wrongCount,
+        accuracy: rate,
+        time_spent: timeSpent,
+        time_display: timeDisplay
+    });
 }
 
 // ==================== 设置 ====================
@@ -800,4 +1027,111 @@ function closeModal() {
 
 function browseDataPath() {
     showToast('请在输入框中直接输入路径', 'warning');
+}
+
+// ==================== 排名系统 ====================
+async function loadRankings() {
+    try {
+        const response = await fetch(`${API_BASE}/api/rankings`);
+        const data = await response.json();
+        
+        if (data.success) {
+            renderRankings(data.rankings);
+        }
+    } catch (error) {
+        console.error('加载排名失败:', error);
+    }
+}
+
+function renderRankings(rankings) {
+    const container = document.getElementById('ranking-list');
+    if (!container) return;
+    
+    if (!rankings || rankings.length === 0) {
+        container.innerHTML = '<div class="empty-ranking">暂无记录</div>';
+        return;
+    }
+    
+    // 按正确率和用时排序（正确率高优先，用时短次优先）
+    rankings.sort((a, b) => {
+        if (b.accuracy !== a.accuracy) {
+            return b.accuracy - a.accuracy;
+        }
+        return a.time_spent - b.time_spent;
+    });
+    
+    const html = rankings.slice(0, 20).map((item, index) => {
+        const rankClass = index < 3 ? `top-${index + 1}` : '';
+        const dateStr = item.date ? new Date(item.date).toLocaleDateString('zh-CN') : '';
+        
+        return `
+            <div class="ranking-item ${rankClass}">
+                <div class="ranking-rank">${index + 1}</div>
+                <div class="ranking-info">
+                    <div class="ranking-name">${escapeHtml(item.name)}</div>
+                    <div class="ranking-details">
+                        <span>${item.correct}/${item.total}题</span>
+                    </div>
+                </div>
+                <div class="ranking-stats">
+                    <div class="ranking-accuracy">${item.accuracy}%</div>
+                    <div class="ranking-time">
+                        <i class="fas fa-clock"></i> ${item.time_display}
+                    </div>
+                    <div class="ranking-date">${dateStr}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    container.innerHTML = html;
+}
+
+async function saveRanking(record) {
+    try {
+        const response = await fetch(`${API_BASE}/api/rankings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(record)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            loadRankings();
+        }
+    } catch (error) {
+        console.error('保存排名失败:', error);
+    }
+}
+
+async function clearRankings() {
+    showConfirmModal(
+        '清空排名',
+        '确定要清空所有排名记录吗？此操作不可恢复。',
+        async () => {
+            try {
+                const response = await fetch(`${API_BASE}/api/rankings`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('排名已清空', 'success');
+                    loadRankings();
+                } else {
+                    showToast('清空失败: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showToast('清空失败: ' + error.message, 'error');
+            }
+        }
+    );
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }

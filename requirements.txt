@@ -1,0 +1,15 @@
+# 题库刷题系统依赖
+
+# Web 框架
+Flask>=3.0.0
+Flask-Cors>=4.0.0
+
+# Word 文档解析
+python-docx>=1.1.0
+
+# Windows COM 支持（用于读取 .doc 文件）
+# 仅在 Windows 系统上需要
+pywin32>=306; sys_platform == "win32"
+
+# 开发工具（可选）
+# python-dotenv>=1.0.0
