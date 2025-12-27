@@ -47,21 +47,34 @@ graph LR
 
 ## 快速开始
 
-### 1. 安装依赖
+### 环境要求
+
+- Python 3.8+
+- pip 包管理器
+- （可选）Microsoft Word（用于读取 .doc 格式文件）
+
+### 1. 克隆项目
+
+```bash
+git clone https://github.com/xunlinxi/dhu-Redlesson-Questionbank.git
+cd dhu-Redlesson-Questionbank
+```
+
+### 2. 安装依赖
 
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-### 2. 启动服务
+### 3. 启动服务
 
 ```bash
 cd backend
 python app.py
 ```
 
-### 3. 访问系统
+### 4. 访问系统
 
 打开浏览器访问：http://localhost:5000
 
