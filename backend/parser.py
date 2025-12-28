@@ -53,6 +53,12 @@ class QuestionParser:
             r'[（(]\s*([A-Fa-fＡ-Ｆａ-ｆ](?:\s*[A-Fa-fＡ-Ｆａ-ｆ])*)\s*[）)]',  # 匹配括号内的字母（可能有空格分隔），支持全角
         ]
         
+        # 空答案标记模式 - 用于识别占位符
+        self.empty_answer_marker = r'[（(]\s*[）)]'
+        
+        # 独立答案行模式 - 如 "正确答案: A" 或 "答案: AB"
+        self.standalone_answer_pattern = r'(?:正确)?答案[:：]?\s*([A-Fa-fＡ-Ｆａ-ｆ]+)'
+        
         # 选项模式 - 支持半角和全角字母，A-F
         self.option_start_pattern = r'^([A-Fa-fＡ-Ｆａ-ｆ])[\.、．\s]'
         
@@ -155,10 +161,13 @@ class QuestionParser:
         return []
     
     def has_answer_marker(self, text):
-        """检查文本是否包含答案标记"""
+        """检查文本是否包含答案标记（包括空标记）"""
         for pattern in self.answer_patterns:
             if re.search(pattern, text):
                 return True
+        # 检查空答案标记
+        if re.search(self.empty_answer_marker, text):
+            return True
         return False
     
     def is_option_line(self, text):
@@ -190,25 +199,54 @@ class QuestionParser:
         options = {}
         text = text.strip()
         
-        # 尝试按多个空格分割（多选项在同一行）
-        # 格式: A 选项A    B 选项B    C 选项C
-        parts = re.split(r'\s{2,}', text)
+        if not text:
+            return options
         
-        for part in parts:
-            part = part.strip()
-            if not part:
-                continue
-            # 匹配 A. 选项 或 A 选项 或 A、选项，支持全角字母 A-F
-            match = re.match(r'^([A-Fa-fＡ-Ｆａ-ｆ])[\.、．\s]?\s*(.+)$', part)
-            if match:
+        # 方法1: 使用选项字母作为分隔符来分割
+        # 支持格式:
+        # - A. A、A．(标准格式，带点号/顿号)
+        # - D15 (数字紧跟字母，无分隔符，如 "C. 12 D15")
+        # - A中文 (中文紧跟字母，无分隔符)
+        # 选项字母可以在行首，或者前面是空格/中文字符/数字
+        # 匹配: 字母 + (点号/顿号/空格 或 后面直接跟数字/中文)
+        option_pattern = r'(?:^|(?<=[\s\u4e00-\u9fa50-9]))([A-Fa-fＡ-Ｆａ-ｆ])(?:[\.、．\s]|(?=\d)|(?=[\u4e00-\u9fa5]))'
+        
+        # 找到所有选项的位置
+        matches = list(re.finditer(option_pattern, text))
+        
+        if matches:
+            for i, match in enumerate(matches):
                 key = self.normalize_option_letter(match.group(1))
-                value = match.group(2).strip()
+                # 选项内容的起始位置（选项字母+分隔符之后）
+                start = match.end()
+                # 结束位置是下一个选项的开始，或者字符串末尾
+                if i + 1 < len(matches):
+                    end = matches[i + 1].start()
+                else:
+                    end = len(text)
+                
+                value = text[start:end].strip()
                 if value:
                     options[key] = value
         
-        # 如果上面没找到多个选项，尝试单选项解析
+        # 方法2: 如果方法1没找到，尝试按多个空格分割
+        if not options:
+            parts = re.split(r'\s{2,}', text)
+            for part in parts:
+                part = part.strip()
+                if not part:
+                    continue
+                # 匹配 A. 选项 或 A 选项 或 A、选项，支持全角字母 A-F
+                match = re.match(r'^([A-Fa-fＡ-Ｆａ-ｆ])[\.、．\s]?\s*(.*)$', part)
+                if match:
+                    key = self.normalize_option_letter(match.group(1))
+                    value = match.group(2).strip()
+                    if value:
+                        options[key] = value
+        
+        # 方法3: 如果还是没找到多个选项，尝试单选项解析
         if len(options) <= 1:
-            match = re.match(r'^([A-Fa-fＡ-Ｆａ-ｆ])[\.、．\s]?\s*(.+)$', text)
+            match = re.match(r'^([A-Fa-fＡ-Ｆａ-ｆ])[\.、．\s]?\s*(.*)$', text)
             if match:
                 key = self.normalize_option_letter(match.group(1))
                 value = match.group(2).strip()
@@ -334,8 +372,28 @@ class QuestionParser:
                     'answer': answer,
                     'bank': bank_name
                 }
+                
+                # 检查题目行末尾是否有选项（如 "题目（ ）A. 选项A"）
+                opts = self.parse_options_from_line(line)
+                if opts:
+                    current_question['options'].update(opts)
+                
                 i += 1
                 continue
+            
+            # 检测独立答案行（如 "正确答案: A"）
+            if current_question and not current_question.get('answer'):
+                answer_match = re.search(self.standalone_answer_pattern, line, re.IGNORECASE)
+                if answer_match:
+                    answer_str = answer_match.group(1).replace(' ', '')
+                    answer = []
+                    for char in answer_str:
+                        normalized = self.normalize_option_letter(char)
+                        if normalized and normalized not in answer:
+                            answer.append(normalized)
+                    current_question['answer'] = answer
+                    i += 1
+                    continue
             
             # 解析选项
             if current_question and self.is_option_line(line):
