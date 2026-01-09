@@ -19,7 +19,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
 # 允许上传的文件扩展名
-ALLOWED_EXTENSIONS = {'doc', 'docx'}
+ALLOWED_EXTENSIONS = {'doc', 'docx', 'txt'}
 
 # 临时上传目录
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
@@ -183,7 +183,11 @@ def delete_bank(bank_name):
 
 @app.route('/api/import', methods=['POST'])
 def import_questions():
-    """导入题库"""
+    """导入题库
+    
+    支持 .txt 文件直接导入
+    支持 .doc/.docx 文件自动转换为文本后导入
+    """
     if 'file' not in request.files:
         return jsonify({
             "success": False,
@@ -202,30 +206,36 @@ def import_questions():
     if not allowed_file(file.filename):
         return jsonify({
             "success": False,
-            "error": "不支持的文件格式，请上传.doc或.docx文件"
+            "error": "不支持的文件格式，请上传 .txt、.doc 或 .docx 文件"
         }), 400
     
     try:
-        # 保存上传的文件 - 使用原始文件名（保留中文）
-        # secure_filename会去掉中文字符，所以我们需要特殊处理
         import unicodedata
         import re as regex
+        from datetime import datetime
         
         original_filename = file.filename
+        ext = os.path.splitext(original_filename)[1].lower()
+        
         # 清理文件名中的特殊字符，但保留中文
         safe_filename = unicodedata.normalize('NFKC', original_filename)
         safe_filename = regex.sub(r'[<>:"/\\|?*]', '_', safe_filename)
         
         # 如果文件名为空或只有扩展名，使用时间戳
         if not safe_filename or safe_filename.startswith('.'):
-            from datetime import datetime
-            safe_filename = f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}{os.path.splitext(original_filename)[1]}"
+            safe_filename = f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
         
         file_path = os.path.join(UPLOAD_FOLDER, safe_filename)
         file.save(file_path)
         
-        # 解析题目（parse_file现在返回元组：questions, extracted_name）
-        questions, extracted_name = parse_file(file_path, bank_name if bank_name else None)
+        txt_file_path = file_path
+        
+        # 如果是 doc/docx，先转换为 txt
+        if ext in ['.doc', '.docx']:
+            txt_file_path = convert_word_to_txt(file_path)
+        
+        # 解析题目
+        questions, extracted_name = parse_file(txt_file_path, bank_name if bank_name else None)
         
         # 如果没有指定题库名称，使用提取的名称
         if not bank_name:
@@ -241,7 +251,6 @@ def import_questions():
         data = load_questions()
         
         # 添加题库信息
-        from datetime import datetime
         data['banks'][bank_name] = {
             "source_file": original_filename,
             "import_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -259,6 +268,8 @@ def import_questions():
         # 删除临时文件
         try:
             os.remove(file_path)
+            if txt_file_path != file_path:
+                os.remove(txt_file_path)
         except:
             pass
         
@@ -273,6 +284,42 @@ def import_questions():
             "success": False,
             "error": f"导入失败: {str(e)}"
         }), 500
+
+
+def convert_word_to_txt(file_path):
+    """将 Word 文档转换为 TXT 文件"""
+    ext = os.path.splitext(file_path)[1].lower()
+    txt_path = file_path.rsplit('.', 1)[0] + '.txt'
+    
+    if ext == '.docx':
+        # 使用 python-docx 读取
+        from docx import Document
+        doc = Document(file_path)
+        text_content = []
+        for para in doc.paragraphs:
+            text_content.append(para.text)
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(text_content))
+    elif ext == '.doc':
+        # 使用 pywin32 读取
+        import pythoncom
+        import win32com.client
+        pythoncom.CoInitialize()
+        try:
+            word = win32com.client.Dispatch("Word.Application")
+            word.Visible = False
+            try:
+                doc = word.Documents.Open(os.path.abspath(file_path))
+                text = doc.Content.Text
+                doc.Close()
+                with open(txt_path, 'w', encoding='utf-8') as f:
+                    f.write(text.replace('\r', '\n'))
+            finally:
+                word.Quit()
+        finally:
+            pythoncom.CoUninitialize()
+    
+    return txt_path
 
 
 # ==================== 题目相关API ====================

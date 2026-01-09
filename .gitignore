@@ -34,10 +34,8 @@ env/
 *~
 
 # 项目数据
-data/
+# 不忽略data目录，允许题库数据上传到GitHub
 uploads/
-*.json
-!package.json
 
 # 日志
 *.log
@@ -48,7 +46,7 @@ logs/
 Thumbs.db
 desktop.ini
 
-# 题库文件（敏感数据）
+# 上传的原始文件（临时文件）
 *.doc
 *.docx
 

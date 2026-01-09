@@ -102,17 +102,18 @@
                     <div class="upload-area" id="upload-area">
                         <i class="fas fa-cloud-upload-alt"></i>
                         <p>拖拽文件到此处或点击上传</p>
-                        <p class="hint">支持 .doc 和 .docx 格式</p>
-                        <input type="file" id="file-input" accept=".doc,.docx" hidden>
+                        <p class="hint">支持 .txt、.doc、.docx 格式<br><small>推荐使用TXT格式避免Word自动编号问题；doc/docx会自动转换为文本处理</small>
+                        </p>
+                        <input type="file" id="file-input" accept=".txt,.doc,.docx" hidden>
                     </div>
 
                     <div class="import-form">
                         <div class="form-group">
                             <label for="bank-name">题库名称（可选）</label>
-                            <input type="text" id="bank-name" placeholder="留空则使用文件名">
+                            <input type="text" id="bank-name" placeholder="留空则自动识别">
                         </div>
                         <div class="selected-file" id="selected-file" style="display: none;">
-                            <i class="fas fa-file-word"></i>
+                            <i class="fas fa-file-alt"></i>
                             <span id="file-name"></span>
                             <button class="btn-icon" onclick="clearFile()">
                                 <i class="fas fa-times"></i>

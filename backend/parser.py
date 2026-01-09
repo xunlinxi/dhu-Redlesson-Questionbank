@@ -119,8 +119,24 @@ class QuestionParser:
             return self.read_docx(file_path)
         elif ext == '.doc':
             return self.read_doc(file_path)
+        elif ext == '.txt':
+            return self.read_txt(file_path)
         else:
             raise Exception(f"不支持的文件格式: {ext}")
+    
+    def read_txt(self, file_path):
+        """读取TXT文件"""
+        # 尝试不同编码
+        encodings = ['utf-8', 'gbk', 'gb2312', 'utf-16', 'ansi']
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding) as f:
+                    text = f.read()
+                lines = [line.strip() for line in text.split('\n') if line.strip()]
+                return lines
+            except (UnicodeDecodeError, UnicodeError):
+                continue
+        raise Exception("无法识别TXT文件编码")
     
     def detect_question_type_line(self, text):
         """检测是否是题型标识行"""
@@ -297,6 +313,9 @@ class QuestionParser:
                 continue
             # 跳过选项行
             if self.is_option_line(line):
+                continue
+            # 跳过独立答案行
+            if re.search(self.standalone_answer_pattern, line, re.IGNORECASE):
                 continue
             
             # 尝试提取

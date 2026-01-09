@@ -209,11 +209,11 @@ function initUpload() {
 }
 
 function handleFileSelect(file) {
-    const allowedTypes = ['.doc', '.docx'];
+    const allowedTypes = ['.txt', '.doc', '.docx'];
     const ext = '.' + file.name.split('.').pop().toLowerCase();
     
     if (!allowedTypes.includes(ext)) {
-        showToast('请选择.doc或.docx格式的文件', 'error');
+        showToast('请选择 .txt、.doc 或 .docx 格式的文件', 'error');
         return;
     }
     
@@ -502,7 +502,7 @@ async function editQuestion(questionId) {
             
             // 渲染选项编辑
             const optionsDiv = document.getElementById('edit-options');
-            optionsDiv.innerHTML = ['A', 'B', 'C', 'D', 'E'].map(key => `
+            optionsDiv.innerHTML = ['A', 'B', 'C', 'D', 'E', 'F'].map(key => `
                 <div class="option-edit">
                     <span>${key}.</span>
                     <input type="text" id="edit-option-${key}" value="${q.options[key] || ''}" placeholder="选项${key}">
@@ -525,10 +525,13 @@ async function saveQuestion() {
     if (!editingQuestionId) return;
     
     const options = {};
-    ['A', 'B', 'C', 'D', 'E'].forEach(key => {
-        const value = document.getElementById(`edit-option-${key}`).value.trim();
-        if (value) {
-            options[key] = value;
+    ['A', 'B', 'C', 'D', 'E', 'F'].forEach(key => {
+        const input = document.getElementById(`edit-option-${key}`);
+        if (input) {
+            const value = input.value.trim();
+            if (value) {
+                options[key] = value;
+            }
         }
     });
     
