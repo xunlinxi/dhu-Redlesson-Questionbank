@@ -49,6 +49,8 @@ desktop.ini
 # 上传的原始文件（临时文件）
 *.doc
 *.docx
+*.txt
+*.pdf
 
 # 临时文件
 tmp/
