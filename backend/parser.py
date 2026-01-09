@@ -52,6 +52,7 @@ class QuestionParser:
         self.answer_patterns = [
             r'[（(]\s*([A-Za-zＡ-Ｚａ-ｚ](?:\s*[A-Za-zＡ-Ｚａ-ｚ])*)\s*[）)]',  # 括号内的字母（可能有空格分隔），支持全角
             r'\?\s*([A-Za-zＡ-Ｚａ-ｚ]+)',  # 匹配 ?D 或 ?ABC 格式（问号后跟答案字母），忽略问号
+            r'[（(]\s*([A-Za-zＡ-Ｚａ-ｚ]{2,})\s*$',  # 行尾有左括号和答案但没有右括号闭合（多选题跨行格式）
         ]
         
         # 空答案标记模式 - 用于识别占位符
@@ -71,12 +72,12 @@ class QuestionParser:
     
     def normalize_option_letter(self, letter):
         """将全角字母转换为半角大写"""
-        # 全角大写 A-F
-        fullwidth_upper = 'ＡＢＣＤＥＦ'
-        # 全角小写 a-f
-        fullwidth_lower = 'ａｂｃｄｅｆ'
+        # 全角大写 A-Z
+        fullwidth_upper = 'ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ'
+        # 全角小写 a-z
+        fullwidth_lower = 'ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ'
         # 半角
-        halfwidth = 'ABCDEF'
+        halfwidth = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
         
         if letter in fullwidth_upper:
             return halfwidth[fullwidth_upper.index(letter)]
@@ -294,19 +295,32 @@ class QuestionParser:
             r'《([^》]+)》',  # 书名号内容
             r'(毛泽东思想[^题库\d]*)',
             r'(习近平[^题库\d]*思想[^题库\d]*概论)',
+            r'(中国近代史纲要)',
+            r'(思想道德与法治)',
+            r'纲要.*?选择题',  # 匹配《纲要》选择题
+            r'思修',  # 匹配思修
             r'([\u4e00-\u9fa5]+概论)',
         ]
         
         for pattern in patterns:
             match = re.search(pattern, name_from_file)
             if match:
-                name = match.group(1)
+                name = match.group(1) if match.lastindex else match.group(0)
+                # 特殊处理：毛概 -> 毛泽东思想和中国特色社会主义理论体系概论
+                if name == '毛概':
+                    name = '毛泽东思想和中国特色社会主义理论体系概论'
+                # 特殊处理：纲要 -> 中国近代史纲要
+                if '纲要' in name and '中国近代史' not in name:
+                    name = '中国近代史纲要'
+                # 特殊处理：思修 -> 思想道德与法治
+                if '思修' in name:
+                    name = '思想道德与法治'
                 # 清理名称
                 name = re.sub(r'\d{4}[-年]', '', name)
-                name = re.sub(r'期末|题库|修订|学期', '', name)
+                name = re.sub(r'期末|题库|修订|学期|选择题|年月|最新', '', name)
                 name = name.strip('_- 　()（）')
-                if name and len(name) >= 4:
-                    return name[:30]
+                if name and len(name) >= 2:
+                    return name[:50]
         
         # 从文档内容提取
         for line in lines[:10]:
@@ -382,6 +396,85 @@ class QuestionParser:
                 current_type = q_type
                 i += 1
                 continue
+            
+            # 检测题号开头但无括号答案的题目行（如 "79、刑法中关于紧急避险..."）
+            # 这类题目的答案可能在后续行（括号形式或独立答案行如 "答案：ABCD"）
+            num_match = re.match(self.question_number_pattern, line)
+            if num_match and not self.has_answer_marker(line) and not self.is_option_line(line):
+                # 向后查找，收集多行题目内容
+                j = i + 1
+                question_lines = [line]  # 收集所有题目行
+                answer_found = []
+                answer_in_bracket = False  # 答案是否在括号中
+                has_options = False
+                has_standalone_answer = False
+                
+                while j < len(lines) and j < i + 15:  # 最多向后看15行
+                    next_line = lines[j].strip()
+                    if not next_line:
+                        j += 1
+                        continue
+                    
+                    # 遇到新题号则停止（排除选项行）
+                    if re.match(self.question_number_pattern, next_line) and not self.is_option_line(next_line):
+                        break
+                    
+                    # 检查这行是否包含括号答案
+                    if self.has_answer_marker(next_line) and not self.is_option_line(next_line):
+                        # 这是题目的延续行，包含答案
+                        question_lines.append(next_line)
+                        answer_found = self.extract_answer(next_line)
+                        answer_in_bracket = True
+                        j += 1
+                        continue
+                    
+                    # 检查独立答案行
+                    if re.search(self.standalone_answer_pattern, next_line, re.IGNORECASE):
+                        has_standalone_answer = True
+                        answer_match = re.search(self.standalone_answer_pattern, next_line, re.IGNORECASE)
+                        if answer_match:
+                            answer_str = answer_match.group(1).replace(' ', '')
+                            for char in answer_str:
+                                normalized = self.normalize_option_letter(char)
+                                if normalized and normalized not in answer_found:
+                                    answer_found.append(normalized)
+                        break
+                    
+                    # 检查选项行
+                    if self.is_option_line(next_line):
+                        has_options = True
+                        j += 1
+                        continue
+                    
+                    # 如果不是选项行也不是新题目，可能是题目续行
+                    if not self.is_option_line(next_line):
+                        question_lines.append(next_line)
+                    
+                    j += 1
+                
+                # 如果找到了答案（括号形式或独立答案行），则认为是新题目
+                if answer_found or (has_options and has_standalone_answer):
+                    # 保存上一题
+                    if current_question and (current_question.get('options') or current_question.get('question')):
+                        questions.append(current_question)
+                    
+                    # 合并多行题目内容
+                    full_question = ' '.join(question_lines)
+                    question_text = self.clean_question_text(full_question)
+                    
+                    current_question = {
+                        'chapter': current_chapter,
+                        'type': current_type,
+                        'question': question_text,
+                        'options': {},
+                        'answer': answer_found,
+                        'bank': bank_name
+                    }
+                    
+                    # 跳过已经处理的行（跳到j的位置继续），避免重复识别
+                    # j 已经指向下一个未处理的行或选项行
+                    i = j
+                    continue
             
             # 检测题目行（包含答案标记的行）
             if self.has_answer_marker(line):
