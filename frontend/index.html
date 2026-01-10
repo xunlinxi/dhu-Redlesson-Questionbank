@@ -364,37 +364,54 @@
                         </div>
                     </div><!-- end practice-main -->
 
-                    <!-- 右侧：排名面板 -->
-                    <div class="ranking-panel">
-                        <div class="ranking-header">
-                            <h3><i class="fas fa-trophy"></i> 成绩排行榜</h3>
-                            <button class="btn btn-small btn-danger" onclick="clearRankings()" title="清空排名">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                        <div class="ranking-list" id="ranking-list">
-                            <div class="empty-ranking">暂无记录</div>
-                        </div>
-
-                        <!-- 答题卡（模拟考试用） -->
-                        <div class="question-nav-panel" id="question-nav-panel" style="display: none;">
-                            <div class="nav-panel-header">
-                                <span>答题卡</span>
-                                <span class="nav-stats"><span id="answered-count">0</span>/<span
-                                        id="nav-total">0</span></span>
+                    <!-- 右侧：独立面板区域 -->
+                    <div class="side-panels">
+                        <!-- 成绩排行榜（独立窗口，默认折叠） -->
+                        <div class="side-panel collapsible-panel collapsed" id="ranking-panel-wrapper">
+                            <div class="panel-header" onclick="togglePanel('ranking-panel-wrapper')">
+                                <h3><i class="fas fa-trophy"></i> 成绩排行榜</h3>
+                                <div class="panel-header-right">
+                                    <button class="btn btn-small btn-danger"
+                                        onclick="event.stopPropagation(); clearRankings()" title="清空排名">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    <i class="fas fa-chevron-down toggle-icon"></i>
+                                </div>
                             </div>
-                            <div class="question-nav-grid" id="question-nav-grid">
-                                <!-- 动态生成题目导航按钮 -->
+                            <div class="panel-content">
+                                <div class="ranking-list" id="ranking-list">
+                                    <div class="empty-ranking">暂无记录</div>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- 进度保存面板 -->
-                        <div class="progress-panel" id="progress-panel">
-                            <div class="progress-panel-header">
+                        <!-- 做题进度（独立窗口，默认展开） -->
+                        <div class="side-panel collapsible-panel" id="progress-panel-wrapper">
+                            <div class="panel-header" onclick="togglePanel('progress-panel-wrapper')">
                                 <h3><i class="fas fa-bookmark"></i> 做题进度</h3>
+                                <i class="fas fa-chevron-down toggle-icon"></i>
                             </div>
-                            <div class="progress-list" id="progress-list">
-                                <div class="empty-progress">暂无保存的进度</div>
+                            <div class="panel-content">
+                                <div class="progress-list" id="progress-list">
+                                    <div class="empty-progress">暂无保存的进度</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 答题卡（独立窗口，默认展开） -->
+                        <div class="side-panel collapsible-panel" id="question-nav-panel" style="display: none;">
+                            <div class="panel-header" onclick="togglePanel('question-nav-panel')">
+                                <span><i class="fas fa-th"></i> 答题卡</span>
+                                <div class="panel-header-right">
+                                    <span class="nav-stats"><span id="answered-count">0</span>/<span
+                                            id="nav-total">0</span></span>
+                                    <i class="fas fa-chevron-down toggle-icon"></i>
+                                </div>
+                            </div>
+                            <div class="panel-content">
+                                <div class="question-nav-grid" id="question-nav-grid">
+                                    <!-- 动态生成题目导航按钮 -->
+                                </div>
                             </div>
                         </div>
                     </div>

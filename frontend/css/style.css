@@ -1284,6 +1284,27 @@ select.form-control {
     min-width: 0;
 }
 
+/* 右侧独立面板容器 */
+.side-panels {
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: sticky;
+    top: 20px;
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+}
+
+/* 每个独立面板 */
+.side-panel {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    flex-shrink: 0;
+}
+
+/* 保留旧的 ranking-panel 兼容性 */
 .ranking-panel {
     width: 320px;
     background: var(--card-bg);
@@ -1454,7 +1475,8 @@ select.form-control {
         flex-direction: column;
     }
 
-    .ranking-panel {
+    .ranking-panel,
+    .side-panels {
         width: 100%;
         position: static;
         max-height: 400px;
@@ -1492,27 +1514,84 @@ select.form-control {
     color: white;
 }
 
-/* 题目导航面板 */
-.question-nav-panel {
+/* ==================== 可折叠面板 ==================== */
+.collapsible-panel {
     background: var(--card-bg);
     border-radius: var(--radius);
-    padding: 15px;
-    margin-bottom: 15px;
     box-shadow: var(--shadow);
+    overflow: hidden;
 }
 
-.nav-panel-header {
+/* 在 side-panels 外部使用时的间距 */
+.collapsible-panel:not(.side-panel) {
+    margin-bottom: 12px;
+}
+
+.collapsible-panel .panel-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    padding: 12px 15px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.collapsible-panel .panel-header:hover {
+    background: var(--bg-color);
+}
+
+.collapsible-panel .panel-header h3,
+.collapsible-panel .panel-header>span {
+    font-size: 14px;
     font-weight: 600;
     color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.collapsible-panel .panel-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.collapsible-panel .toggle-icon {
+    color: var(--text-secondary);
+    font-size: 12px;
+    transition: transform 0.3s;
+}
+
+.collapsible-panel.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.collapsible-panel .panel-content {
+    padding: 0 15px 15px;
+    max-height: 500px;
+    overflow-y: auto;
+    transition: max-height 0.3s, padding 0.3s, opacity 0.3s;
+}
+
+.collapsible-panel.collapsed .panel-content {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
+/* 题目导航面板（兼容旧样式） */
+.question-nav-panel {
+    /* 继承 collapsible-panel 样式 */
 }
 
 .nav-stats {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-secondary);
+    font-weight: 500;
 }
 
 .question-nav-grid {
@@ -1554,6 +1633,121 @@ select.form-control {
 }
 
 .nav-btn.answered.current {
+    background: var(--success-color);
+    color: white;
+}
+
+/* 答题卡分组样式 */
+.nav-section {
+    margin-bottom: 15px;
+}
+
+.nav-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    background: var(--primary-light);
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.nav-section-title.multi {
+    color: var(--warning-color);
+    background: var(--warning-light);
+}
+
+.nav-section-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.nav-page-break {
+    width: 100%;
+    height: 1px;
+    background: var(--border-color);
+    margin: 10px 0;
+}
+
+/* 答题卡分页控制 */
+.nav-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-page-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+}
+
+.nav-page-btn:hover:not(.disabled) {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.nav-page-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.nav-page-num {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+}
+
+.nav-page-num:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.nav-page-num.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.nav-btn.multi {
+    border-color: var(--warning-color);
+}
+
+.nav-btn.multi.answered {
+    border-color: var(--success-color);
+    background: rgba(82, 196, 26, 0.15);
+    color: var(--success-color);
+}
+
+.nav-btn.multi.current {
+    border-color: var(--warning-color);
+    background: var(--warning-color);
+    color: white;
+}
+
+.nav-btn.multi.answered.current {
     background: var(--success-color);
     color: white;
 }
@@ -1889,31 +2083,6 @@ select.form-control {
 }
 
 /* ==================== 新增：进度面板 ==================== */
-.progress-panel {
-    background: var(--card-bg);
-    border-radius: var(--radius);
-    padding: 15px;
-    margin-top: 20px;
-    box-shadow: var(--shadow);
-}
-
-.progress-panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.progress-panel-header h3 {
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-color);
-}
-
 .progress-list {
     display: flex;
     flex-direction: column;

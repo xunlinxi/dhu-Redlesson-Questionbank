@@ -61,3 +61,6 @@ tmp/
 temp/
 *.tmp
 *.bak
+
+# 测试文件
+tests/

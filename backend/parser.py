@@ -202,9 +202,15 @@ class QuestionParser:
         if re.match(self.option_start_pattern, text):
             # 确保这不是一个题目行（题目行会包含答案标记）
             if not self.has_answer_marker(text):
+                # 检查选项内容是否有效（过滤如 "B. )" 这样的无效行）
+                match = re.match(r'^[A-Za-zＡ-Ｚａ-ｚ][\.、．\s]+(.*)$', text)
+                if match:
+                    content = match.group(1).strip()
+                    if self.is_invalid_option_content(content):
+                        return False
                 return True
-        # 包含多个选项（如 A 选项A    B 选项B），支持全角字母 A-F
-        if re.search(r'[A-Fa-fＡ-Ｆａ-ｆ][\.、．\s]\s*\S+\s{2,}[A-Fa-fＡ-Ｆａ-ｆ][\.、．\s]', text):
+        # 包含多个选项（如 A 选项A    B 选项B），支持全角字母 A-H
+        if re.search(r'[A-Ha-hＡ-Ｈａ-ｈ][\.、．\s]\s*\S+\s{2,}[A-Ha-hＡ-Ｈａ-ｈ][\.、．\s]', text):
             if not self.has_answer_marker(text):
                 return True
         return False
@@ -220,68 +226,187 @@ class QuestionParser:
         cleaned = re.sub(question_mark_answer, '（  ）', cleaned, count=1)
         # 移除题号
         cleaned = re.sub(self.question_number_pattern, '', cleaned)
+        # 清理嵌套括号：（（ ） ）或 (( ) ) 等情况，只保留外层括号
+        # 匹配外层括号内包含内层括号的情况
+        nested_bracket_pattern = r'[（(]\s*[（(]\s*[）)]\s*[）)]'
+        cleaned = re.sub(nested_bracket_pattern, '（  ）', cleaned)
         return cleaned.strip()
     
     def parse_options_from_line(self, text):
-        """从一行中解析选项"""
+        """从一行中解析选项
+        
+        核心策略：识别所有 A/B/C/D/E/F 选项字母，然后按这些字母分割文本
+        支持格式：
+        - A. 选项  B. 选项  （标准格式）
+        - A、选项  B、选项  （顿号格式）
+        - A 选项   B 选项   （空格格式）
+        - A选项B选项C选项   （无分隔，选项字母后直接跟中文）
+        - A. 高质量 B. 高速度C. 高水平 D.高效率  （混合格式）
+        """
         options = {}
         text = text.strip()
         
         if not text:
             return options
         
-        # 方法1: 使用选项字母作为分隔符来分割
-        # 支持格式:
-        # - A. A、A．(标准格式，带点号/顿号)
-        # - D15 (数字紧跟字母，无分隔符，如 "C. 12 D15")
-        # - A中文 (中文紧跟字母，无分隔符)
-        # 选项字母可以在行首，或者前面是空格/中文字符/数字
-        # 匹配: 字母 + (点号/顿号/空格 或 后面直接跟数字/中文)，允许 A-Z
-        option_pattern = r'(?:^|(?<=[\s\u4e00-\u9fa50-9]))([A-Za-zＡ-Ｚａ-ｚ])(?:[\.、．\s]|(?=\d)|(?=[\u4e00-\u9fa5]))'
+        # 查找所有选项字母的位置
+        # 选项字母的特征：A-H（半角或全角），后面跟点号/顿号/空格/中文
+        option_positions = []
         
-        # 找到所有选项的位置
+        i = 0
+        while i < len(text):
+            char = text[i]
+            normalized = self.normalize_option_letter(char)
+            
+            # 检查是否是有效的选项字母 A-H（支持最多8个选项）
+            if normalized in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:
+                # 检查后面的字符来确认这是选项开头
+                if i + 1 < len(text):
+                    next_char = text[i + 1]
+                    
+                    # 情况1: 后跟点号、顿号（最可靠的选项标识，无条件识别）
+                    if next_char in '.、．。':
+                        content_start = i + 2
+                        # 跳过点号后的空格
+                        while content_start < len(text) and text[content_start] in ' \t　':
+                            content_start += 1
+                        option_positions.append((i, normalized, content_start))
+                        i = content_start
+                        continue
+                    
+                    # 情况2: 后跟空格（如 "A 选项"）- 需要前面也是行首或空格
+                    elif next_char in ' \t　':
+                        # 只有在行首或前面是空格/标点时才识别为选项
+                        if i == 0 or text[i-1] in ' \t　.、．。）)':
+                            content_start = i + 1
+                            while content_start < len(text) and text[content_start] in ' \t　':
+                                content_start += 1
+                            option_positions.append((i, normalized, content_start))
+                            i = content_start
+                            continue
+                    
+                    # 情况3: 后面直接跟中文字符（如 "A高质量"、"D马克思"）
+                    elif '\u4e00' <= next_char <= '\u9fff':
+                        # 额外检查：前面应该是行首、空格、或其他选项的结尾（中文/标点）
+                        # 避免把 "ABCD" 这种答案字符串误识别
+                        if i == 0 or text[i-1] in ' \t　.、．。）)':
+                            option_positions.append((i, normalized, i + 1))
+                            i += 1
+                            continue
+                        # 前面是中文也可以（如 "高速度C高水平"）
+                        elif '\u4e00' <= text[i-1] <= '\u9fff':
+                            option_positions.append((i, normalized, i + 1))
+                            i += 1
+                            continue
+                    
+                    # 情况4: 后面直接跟数字（如 "D15"、"C12"）
+                    elif next_char.isdigit():
+                        # 前面应该是空格、中文或标点
+                        if i == 0 or text[i-1] in ' \t　.、．。）)' or ('\u4e00' <= text[i-1] <= '\u9fff'):
+                            option_positions.append((i, normalized, i + 1))
+                            i += 1
+                            continue
+            i += 1
+        
+        # 根据找到的位置提取选项内容
+        for idx, (pos, key, content_start) in enumerate(option_positions):
+            # 内容结束位置是下一个选项的开始位置，或字符串末尾
+            if idx + 1 < len(option_positions):
+                content_end = option_positions[idx + 1][0]
+            else:
+                content_end = len(text)
+            
+            # 提取内容并清理
+            value = text[content_start:content_end].strip()
+            if value and not self.is_invalid_option_content(value):
+                options[key] = value
+        
+        # 如果上面的方法找到了至少2个选项，直接返回
+        if len(options) >= 2:
+            return options
+        
+        # 备用方法: 使用正则匹配标准格式
+        options = {}
+        # 标准格式: A. 或 A、或 A．后跟内容
+        option_pattern = r'(?:^|(?<=\s))([A-Ha-hＡ-Ｈａ-ｈ])[\.、．]\s*'
         matches = list(re.finditer(option_pattern, text))
         
         if matches:
             for i, match in enumerate(matches):
                 key = self.normalize_option_letter(match.group(1))
-                # 选项内容的起始位置（选项字母+分隔符之后）
                 start = match.end()
-                # 结束位置是下一个选项的开始，或者字符串末尾
                 if i + 1 < len(matches):
                     end = matches[i + 1].start()
                 else:
                     end = len(text)
                 
                 value = text[start:end].strip()
-                if value:
-                    options[key] = value
-        
-        # 方法2: 如果方法1没找到，尝试按多个空格分割
-        if not options:
-            parts = re.split(r'\s{2,}', text)
-            for part in parts:
-                part = part.strip()
-                if not part:
-                    continue
-                # 匹配 A. 选项 或 A 选项 或 A、选项，支持全角字母 A-Z
-                match = re.match(r'^([A-Za-zＡ-Ｚａ-ｚ])[\.、．\s]?\s*(.*)$', part)
-                if match:
-                    key = self.normalize_option_letter(match.group(1))
-                    value = match.group(2).strip()
-                    if value:
-                        options[key] = value
-        
-        # 方法3: 如果还是没找到多个选项，尝试单选项解析
-        if len(options) <= 1:
-            match = re.match(r'^([A-Za-zＡ-Ｚａ-ｚ])[\.、．\s]?\s*(.*)$', text)
-            if match:
-                key = self.normalize_option_letter(match.group(1))
-                value = match.group(2).strip()
-                if value:
+                if value and not self.is_invalid_option_content(value):
                     options[key] = value
         
         return options
+    
+    def is_invalid_option_content(self, content):
+        """检查选项内容是否无效（如纯括号、空白等）"""
+        if not content:
+            return True
+        # 去除所有空白和括号后检查是否为空
+        cleaned = re.sub(r'[\s\(\)\[\]\{\}（）【】\u0000-\u001f]', '', content)
+        # 如果清理后为空或只剩下标点符号，则无效
+        if not cleaned or re.match(r'^[\.\,\;\:\!\?。，；：！？、]+$', cleaned):
+            return True
+        # 如果只有单个字符且是标点，无效
+        if len(cleaned) == 1 and not cleaned.isalnum():
+            return True
+        return False
+    
+    def parse_multiline_options(self, lines, start_index):
+        """解析多行选项
+        
+        核心策略：先收集所有选项相关的行，合并成一个字符串（忽略换行），
+        然后按选项字母(A/B/C/D/E)分割。
+        
+        这样可以处理以下情况：
+        - AB在一行，CD在另一行
+        - ABC在一行，D的内容在另一行
+        - 每个选项单独一行
+        
+        返回: (options_dict, end_index)
+        """
+        collected_lines = []
+        i = start_index
+        
+        while i < len(lines):
+            line = lines[i].strip()
+            
+            # 跳过空行
+            if not line:
+                i += 1
+                continue
+            
+            # 检查是否是新题目（题号开头且不是选项行）
+            if re.match(self.question_number_pattern, line) and not self.is_option_line(line):
+                break
+            
+            # 检查是否是题型标识或章节
+            if self.detect_question_type_line(line) or self.detect_chapter(line):
+                break
+            
+            # 检查是否是独立答案行
+            if re.search(self.standalone_answer_pattern, line, re.IGNORECASE):
+                break
+            
+            # 收集这行
+            collected_lines.append(line)
+            i += 1
+        
+        # 合并所有行为一个字符串（用空格连接，忽略原有换行）
+        merged_text = ' '.join(collected_lines)
+        
+        # 使用增强的单行解析
+        options = self.parse_options_from_line(merged_text)
+        
+        return options, i
     
     def extract_bank_name(self, lines, file_path):
         """智能提取题库名称"""
@@ -408,6 +533,7 @@ class QuestionParser:
                 answer_in_bracket = False  # 答案是否在括号中
                 has_options = False
                 has_standalone_answer = False
+                first_option_line_index = -1  # 记录第一个选项行的位置
                 
                 while j < len(lines) and j < i + 15:  # 最多向后看15行
                     next_line = lines[j].strip()
@@ -419,7 +545,7 @@ class QuestionParser:
                     if re.match(self.question_number_pattern, next_line) and not self.is_option_line(next_line):
                         break
                     
-                    # 检查这行是否包含括号答案
+                    # 检查这行是否包含括号答案（且不是选项行）
                     if self.has_answer_marker(next_line) and not self.is_option_line(next_line):
                         # 这是题目的延续行，包含答案
                         question_lines.append(next_line)
@@ -443,6 +569,8 @@ class QuestionParser:
                     # 检查选项行
                     if self.is_option_line(next_line):
                         has_options = True
+                        if first_option_line_index == -1:
+                            first_option_line_index = j  # 记录第一个选项行位置
                         j += 1
                         continue
                     
@@ -471,9 +599,12 @@ class QuestionParser:
                         'bank': bank_name
                     }
                     
-                    # 跳过已经处理的行（跳到j的位置继续），避免重复识别
-                    # j 已经指向下一个未处理的行或选项行
-                    i = j
+                    # 如果有选项行，从第一个选项行开始继续处理
+                    # 这样后续的选项解析逻辑会处理这些选项
+                    if first_option_line_index > 0:
+                        i = first_option_line_index
+                    else:
+                        i = j
                     continue
             
             # 检测题目行（包含答案标记的行）
@@ -518,12 +649,20 @@ class QuestionParser:
                     i += 1
                     continue
             
-            # 解析选项
+            # 解析选项（使用多行解析）
             if current_question and self.is_option_line(line):
-                opts = self.parse_options_from_line(line)
-                current_question['options'].update(opts)
-                i += 1
-                continue
+                # 使用多行选项解析，从当前行开始
+                opts, new_i = self.parse_multiline_options(lines, i)
+                if opts:
+                    current_question['options'].update(opts)
+                    i = new_i
+                    continue
+                else:
+                    # 如果多行解析失败，回退到单行解析
+                    opts = self.parse_options_from_line(line)
+                    current_question['options'].update(opts)
+                    i += 1
+                    continue
             
             i += 1
         

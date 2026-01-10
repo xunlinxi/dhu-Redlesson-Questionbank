@@ -25,6 +25,10 @@ let isBackMode = false; // 背题库模式：仅显示正确选项
 let editOptionsState = []; // 编辑弹窗中当前的选项列表
 let currentPracticeMode = 'random'; // 当前做题模式：random/exam/sequence/wrong
 let currentWrongBankName = ''; // 错题本当前题库
+let currentProgressId = null; // 当前进度ID（用于覆盖保存）
+let loadedElapsedTime = 0; // 读取存档时已经过的时间（秒）
+let navCurrentPage = 1; // 答题卡当前页码
+const NAV_PAGE_SIZE = 56; // 答题卡每页显示数量
 
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', function() {
@@ -33,7 +37,19 @@ document.addEventListener('DOMContentLoaded', function() {
     loadStats();
     loadConfig();
     startHealthCheck();
+    
+    // 暴露函数到全局作用域（用于onclick调用）
+    window.changeNavPage = changeNavPage;
+    window.togglePanel = togglePanel;
 });
+
+// ==================== 面板折叠功能 ====================
+function togglePanel(panelId) {
+    const panel = document.getElementById(panelId);
+    if (panel) {
+        panel.classList.toggle('collapsed');
+    }
+}
 
 // ==================== 服务器健康检查 ====================
 function startHealthCheck() {
@@ -783,16 +799,28 @@ async function startPractice(examMode = false) {
         const data = await response.json();
         
         if (data.success && data.questions.length > 0) {
-            practiceQuestions = data.questions.map(q => ({
-                ...q,
-                shuffledOptions: shuffleOptionsEnabled ? shuffleEntries(Object.entries(q.options || {})) : null
-            }));
+            practiceQuestions = data.questions.map(q => {
+                if (shuffleOptionsEnabled) {
+                    const shuffled = shuffleEntries(Object.entries(q.options || {}), q.answer);
+                    return {
+                        ...q,
+                        shuffledOptions: shuffled.entries,
+                        shuffledAnswer: shuffled.shuffledAnswer
+                    };
+                }
+                return { ...q, shuffledOptions: null, shuffledAnswer: null };
+            });
             currentQuestionIndex = 0;
             correctCount = 0;
             wrongCount = 0;
             selectedAnswers = [];
             practiceStartTime = new Date();
             isExamMode = examMode;
+            navCurrentPage = 1; // 重置答题卡页码
+            
+            // 重置进度相关变量（新建练习时）
+            currentProgressId = null;
+            loadedElapsedTime = 0;
             
             // 初始化每道题的作答结果
             questionResults = practiceQuestions.map(() => ({
@@ -823,7 +851,11 @@ async function startPractice(examMode = false) {
             // 渲染答题卡
             renderQuestionNav();
             
-            // 设置计时器
+            // 设置计时器（先清除旧的）
+            if (practiceTimer) {
+                clearInterval(practiceTimer);
+                practiceTimer = null;
+            }
             if (enableTimer) {
                 remainingTime = timeMinutes * 60;
                 document.getElementById('timer-display').style.display = 'flex';
@@ -883,21 +915,116 @@ function restartWithSameSettings() {
     }
 }
 
-// 渲染题目导航
+// 渲染题目导航（分组显示单选和多选，支持可切换分页）
 function renderQuestionNav() {
     const grid = document.getElementById('question-nav-grid');
     
-    grid.innerHTML = practiceQuestions.map((_, i) => {
-        const num = i + 1;
-        const answered = questionResults[i]?.answered ? 'answered' : '';
-        const current = i === currentQuestionIndex ? 'current' : '';
-        return `<button class="nav-btn ${answered} ${current}" onclick="goToQuestion(${i})">${num}</button>`;
-    }).join('');
+    // 分离单选和多选题
+    const singleQuestions = [];
+    const multiQuestions = [];
+    practiceQuestions.forEach((q, i) => {
+        if (q.type === 'multi') {
+            multiQuestions.push({ index: i, question: q });
+        } else {
+            singleQuestions.push({ index: i, question: q });
+        }
+    });
+    
+    // 合并所有题目用于分页
+    const allItems = [...singleQuestions, ...multiQuestions];
+    const totalPages = Math.ceil(allItems.length / NAV_PAGE_SIZE);
+    
+    // 确保当前页码有效
+    if (navCurrentPage < 1) navCurrentPage = 1;
+    if (navCurrentPage > totalPages) navCurrentPage = totalPages;
+    if (totalPages === 0) navCurrentPage = 1;
+    
+    // 自动切换到包含当前题目的页面（仅在非手动切换时）
+    if (!manualNavPageChange) {
+        const currentItemIndex = allItems.findIndex(item => item.index === currentQuestionIndex);
+        if (currentItemIndex >= 0) {
+            const targetPage = Math.floor(currentItemIndex / NAV_PAGE_SIZE) + 1;
+            if (targetPage !== navCurrentPage) {
+                navCurrentPage = targetPage;
+            }
+        }
+    }
+    
+    // 计算当前页的题目范围
+    const startIdx = (navCurrentPage - 1) * NAV_PAGE_SIZE;
+    const endIdx = Math.min(startIdx + NAV_PAGE_SIZE, allItems.length);
+    const pageItems = allItems.slice(startIdx, endIdx);
+    
+    let html = '';
+    
+    // 分页控制（如果有多页）
+    if (totalPages > 1) {
+        html += '<div class="nav-pagination">';
+        html += `<button class="nav-page-btn ${navCurrentPage <= 1 ? 'disabled' : ''}" onclick="changeNavPage(${navCurrentPage - 1})" ${navCurrentPage <= 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>`;
+        
+        // 页码按钮
+        for (let p = 1; p <= totalPages; p++) {
+            const active = p === navCurrentPage ? 'active' : '';
+            html += `<button class="nav-page-num ${active}" onclick="changeNavPage(${p})">${p}</button>`;
+        }
+        
+        html += `<button class="nav-page-btn ${navCurrentPage >= totalPages ? 'disabled' : ''}" onclick="changeNavPage(${navCurrentPage + 1})" ${navCurrentPage >= totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+        html += '</div>';
+    }
+    
+    // 找出当前页中单选和多选的分界
+    let currentSection = null;
+    
+    pageItems.forEach((item) => {
+        const itemType = item.question.type === 'multi' ? 'multi' : 'single';
+        
+        // 检查是否需要添加分组标题
+        if (currentSection !== itemType) {
+            // 关闭上一个分组
+            if (currentSection !== null) {
+                html += '</div></div>';
+            }
+            
+            // 开始新分组
+            currentSection = itemType;
+            const totalCount = itemType === 'multi' ? multiQuestions.length : singleQuestions.length;
+            const title = itemType === 'multi' ? '多选题' : '单选题';
+            html += `<div class="nav-section"><div class="nav-section-title ${itemType === 'multi' ? 'multi' : ''}">${title} (${totalCount}题)</div>`;
+            html += '<div class="nav-section-grid">';
+        }
+        
+        const answered = questionResults[item.index]?.answered ? 'answered' : '';
+        const current = item.index === currentQuestionIndex ? 'current' : '';
+        const multiClass = item.question.type === 'multi' ? 'multi' : '';
+        html += `<button class="nav-btn ${multiClass} ${answered} ${current}" onclick="goToQuestion(${item.index})">${item.index + 1}</button>`;
+    });
+    
+    // 关闭最后一个分组
+    if (currentSection !== null) {
+        html += '</div></div>';
+    }
+    
+    grid.innerHTML = html;
     
     // 更新已答题数
     const answeredCount = questionResults.filter(r => r.answered).length;
     document.getElementById('answered-count').textContent = answeredCount;
     document.getElementById('nav-total').textContent = practiceQuestions.length;
+}
+
+// 切换答题卡页面
+let manualNavPageChange = false; // 标记是否是手动切换页面
+
+function changeNavPage(page) {
+    const allCount = practiceQuestions.length;
+    const totalPages = Math.ceil(allCount / NAV_PAGE_SIZE);
+    
+    if (page >= 1 && page <= totalPages) {
+        navCurrentPage = page;
+        manualNavPageChange = true; // 标记为手动切换
+        renderQuestionNav();
+        manualNavPageChange = false; // 渲染完成后重置
+    }
 }
 
 // 跳转到指定题目
@@ -956,41 +1083,49 @@ function renderQuestion() {
     const optionsList = document.getElementById('options-list');
     const optionEntries = question.shuffledOptions || Object.entries(question.options);
     
-    // 检查这道题是否已经作答过
-    if (result.answered) {
-        // 已作答：显示结果状态（刷题模式和模拟考试最终提交后都适用）
-        if (isExamMode) {
-            // 模拟考试模式：显示已选答案但不显示对错
-            optionsList.innerHTML = optionEntries.map(([key, value]) => {
-                const isSelected = result.userAnswer.includes(key) ? 'selected' : '';
-                return `<button class="option-btn ${isSelected} disabled" data-key="${key}">
-                    <span class="option-key">${key}</span>
-                    <span class="option-text">${value}</span>
-                </button>`;
-            }).join('');
-            document.getElementById('answer-result').style.display = 'none';
+    // 模拟考试模式：允许随时修改答案，不锁定
+    if (isExamMode) {
+        // 恢复已选答案
+        selectedAnswers = result.answered ? [...result.userAnswer] : [];
+        
+        optionsList.innerHTML = optionEntries.map(([key, value]) => {
+            const isSelected = selectedAnswers.includes(key) ? 'selected' : '';
+            return `<button class="option-btn ${isSelected}" onclick="selectOption('${key}', ${question.type === 'multi'})" data-key="${key}">
+                <span class="option-key">${key}</span>
+                <span class="option-text">${value}</span>
+            </button>`;
+        }).join('');
+        
+        document.getElementById('answer-result').style.display = 'none';
+        document.getElementById('submit-btn').style.display = 'none'; // 模拟考试不需要提交按钮
+        document.getElementById('next-btn').style.display = 'inline-flex';
+        
+        if (currentQuestionIndex === practiceQuestions.length - 1) {
+            document.getElementById('next-btn').innerHTML = '提交试卷 <i class="fas fa-paper-plane"></i>';
         } else {
-            // 刷题模式：显示完整结果
-            optionsList.innerHTML = optionEntries.map(([key, value]) => {
-                const isCorrect = result.correctAnswer.includes(key) ? 'correct' : '';
-                const isWrong = result.userAnswer.includes(key) && !result.correctAnswer.includes(key) ? 'wrong' : '';
-                const isSelected = result.userAnswer.includes(key) ? 'selected' : '';
-                return `<button class="option-btn ${isCorrect} ${isWrong} ${isSelected} disabled" data-key="${key}">
-                    <span class="option-key">${key}</span>
-                    <span class="option-text">${value}</span>
-                </button>`;
-            }).join('');
-            
-            // 显示结果
-            const resultDiv = document.getElementById('answer-result');
-            resultDiv.style.display = 'flex';
-            if (result.isCorrect) {
-                resultDiv.className = 'answer-result correct';
-                resultDiv.innerHTML = '<i class="fas fa-check-circle"></i> 回答正确！';
-            } else {
-                resultDiv.className = 'answer-result wrong';
-                resultDiv.innerHTML = `<i class="fas fa-times-circle"></i> 回答错误，正确答案是: ${result.correctAnswer.join('')}`;
-            }
+            document.getElementById('next-btn').innerHTML = '下一题 <i class="fas fa-arrow-right"></i>';
+        }
+    } else if (result.answered) {
+        // 刷题模式已作答：显示完整结果
+        optionsList.innerHTML = optionEntries.map(([key, value]) => {
+            const isCorrect = result.correctAnswer.includes(key) ? 'correct' : '';
+            const isWrong = result.userAnswer.includes(key) && !result.correctAnswer.includes(key) ? 'wrong' : '';
+            const isSelected = result.userAnswer.includes(key) ? 'selected' : '';
+            return `<button class="option-btn ${isCorrect} ${isWrong} ${isSelected} disabled" data-key="${key}">
+                <span class="option-key">${key}</span>
+                <span class="option-text">${value}</span>
+            </button>`;
+        }).join('');
+        
+        // 显示结果
+        const resultDiv = document.getElementById('answer-result');
+        resultDiv.style.display = 'flex';
+        if (result.isCorrect) {
+            resultDiv.className = 'answer-result correct';
+            resultDiv.innerHTML = '<i class="fas fa-check-circle"></i> 回答正确！';
+        } else {
+            resultDiv.className = 'answer-result wrong';
+            resultDiv.innerHTML = `<i class="fas fa-times-circle"></i> 回答错误，正确答案是: ${result.correctAnswer.join('')}`;
         }
         
         // 已作答的题目隐藏提交按钮
@@ -999,16 +1134,12 @@ function renderQuestion() {
         
         // 更新下一题按钮文字
         if (currentQuestionIndex === practiceQuestions.length - 1) {
-            if (isExamMode) {
-                document.getElementById('next-btn').innerHTML = '提交试卷 <i class="fas fa-paper-plane"></i>';
-            } else {
-                document.getElementById('next-btn').innerHTML = '查看结果 <i class="fas fa-flag-checkered"></i>';
-            }
+            document.getElementById('next-btn').innerHTML = '查看结果 <i class="fas fa-flag-checkered"></i>';
         } else {
             document.getElementById('next-btn').innerHTML = '下一题 <i class="fas fa-arrow-right"></i>';
         }
     } else {
-        // 未作答：正常渲染
+        // 刷题模式未作答：正常渲染
         optionsList.innerHTML = optionEntries.map(([key, value]) => `
             <button class="option-btn" onclick="selectOption('${key}', ${question.type === 'multi'})" data-key="${key}">
                 <span class="option-key">${key}</span>
@@ -1020,17 +1151,7 @@ function renderQuestion() {
         selectedAnswers = [];
         document.getElementById('answer-result').style.display = 'none';
         document.getElementById('submit-btn').style.display = 'inline-flex';
-        
-        if (isExamMode) {
-            // 模拟考试模式：显示下一题按钮用于跳过
-            document.getElementById('next-btn').style.display = 'inline-flex';
-            document.getElementById('next-btn').innerHTML = '跳过 <i class="fas fa-forward"></i>';
-            if (currentQuestionIndex === practiceQuestions.length - 1) {
-                document.getElementById('next-btn').innerHTML = '提交试卷 <i class="fas fa-paper-plane"></i>';
-            }
-        } else {
-            document.getElementById('next-btn').style.display = 'none';
-        }
+        document.getElementById('next-btn').style.display = 'none';
     }
     
     document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
@@ -1059,16 +1180,66 @@ function selectOption(key, isMulti) {
         btn.classList.add('selected');
         selectedAnswers = [key];
     }
+    
+    // 模拟考试模式：自动保存选择的答案（不判分）
+    if (isExamMode && selectedAnswers.length > 0) {
+        saveExamAnswer();
+    }
 }
 
-// 洗牌函数：返回新的选项顺序数组
-function shuffleEntries(entries) {
-    const arr = [...entries];
-    for (let i = arr.length - 1; i > 0; i--) {
+// 模拟考试模式：仅保存答案，不判分
+function saveExamAnswer() {
+    if (!isExamMode) return;
+    const question = practiceQuestions[currentQuestionIndex];
+    // 使用打乱后的答案（如果有）
+    const correctAnswer = question.shuffledAnswer || question.answer || [];
+    questionResults[currentQuestionIndex] = {
+        answered: true,
+        userAnswer: [...selectedAnswers],
+        correctAnswer: correctAnswer,
+        isCorrect: null  // 暂不判分
+    };
+    renderQuestionNav();
+}
+
+// 洗牌函数：只打乱选项内容，保持ABCD顺序不变，同时返回答案映射
+function shuffleEntries(entries, originalAnswer) {
+    const keys = entries.map(([key]) => key).sort(); // 保持字母顺序 A, B, C, D...
+    const values = entries.map(([, value]) => value);
+    const originalKeys = entries.map(([key]) => key).sort();
+    
+    // 创建原始值到原始键的映射
+    const valueToOriginalKey = {};
+    entries.forEach(([key, value]) => {
+        valueToOriginalKey[value] = key;
+    });
+    
+    // 只打乱值
+    for (let i = values.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
+        [values[i], values[j]] = [values[j], values[i]];
     }
-    return arr;
+    
+    // 创建新键到值的映射，以及原始键到新键的映射
+    const newEntries = keys.map((key, idx) => [key, values[idx]]);
+    
+    // 创建答案映射：原始答案字母 -> 新答案字母
+    // 例如原本D是正确答案，D的内容现在在A位置，那么新答案就是A
+    const answerMap = {};
+    newEntries.forEach(([newKey, value]) => {
+        const originalKey = valueToOriginalKey[value];
+        if (originalKey) {
+            answerMap[originalKey] = newKey;
+        }
+    });
+    
+    // 转换正确答案
+    const shuffledAnswer = (originalAnswer || []).map(ans => answerMap[ans] || ans);
+    
+    return {
+        entries: newEntries,
+        shuffledAnswer: shuffledAnswer
+    };
 }
 
 async function submitAnswer() {
@@ -1079,93 +1250,82 @@ async function submitAnswer() {
     
     const question = practiceQuestions[currentQuestionIndex];
     
-    try {
-        const response = await fetch(`${API_BASE}/api/practice/check`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                question_id: question.id,
-                answer: selectedAnswers
-            })
+    // 使用打乱后的答案（如果有），否则使用原始答案
+    const correctAnswer = question.shuffledAnswer || question.answer || [];
+    
+    // 在前端判断答案是否正确
+    const isCorrect = arraysEqual([...selectedAnswers].sort(), [...correctAnswer].sort());
+    
+    // 保存作答结果
+    questionResults[currentQuestionIndex] = {
+        answered: true,
+        userAnswer: [...selectedAnswers],
+        correctAnswer: correctAnswer,
+        isCorrect: isCorrect
+    };
+    
+    // 如果答错，添加到错题本
+    if (!isCorrect) {
+        addToWrongbook(question.id, selectedAnswers);
+    }
+    
+    if (isExamMode) {
+        // 模拟考试模式：不显示答案，只标记已答
+        document.querySelectorAll('.option-btn').forEach(btn => {
+            btn.classList.add('disabled');
         });
         
-        const data = await response.json();
+        // 更新导航
+        renderQuestionNav();
         
-        if (data.success) {
-            // 保存作答结果
-            questionResults[currentQuestionIndex] = {
-                answered: true,
-                userAnswer: [...selectedAnswers],
-                correctAnswer: data.correct_answer,
-                isCorrect: data.correct
-            };
-            
-            // 如果答错，添加到错题本
-            if (!data.correct) {
-                addToWrongbook(question.id, selectedAnswers);
-            }
-            
-            if (isExamMode) {
-                // 模拟考试模式：不显示答案，只标记已答
-                document.querySelectorAll('.option-btn').forEach(btn => {
-                    btn.classList.add('disabled');
-                });
-                
-                // 更新导航
-                renderQuestionNav();
-                
-                // 切换按钮
-                document.getElementById('submit-btn').style.display = 'none';
-                document.getElementById('next-btn').style.display = 'inline-flex';
-                
-                if (currentQuestionIndex === practiceQuestions.length - 1) {
-                    document.getElementById('next-btn').innerHTML = '提交试卷 <i class="fas fa-paper-plane"></i>';
-                } else {
-                    document.getElementById('next-btn').innerHTML = '下一题 <i class="fas fa-arrow-right"></i>';
-                }
-            } else {
-                // 刷题模式：显示答案
-                document.querySelectorAll('.option-btn').forEach(btn => {
-                    btn.classList.add('disabled');
-                    const key = btn.dataset.key;
-                    
-                    if (data.correct_answer.includes(key)) {
-                        btn.classList.add('correct');
-                    } else if (selectedAnswers.includes(key)) {
-                        btn.classList.add('wrong');
-                    }
-                });
-                
-                // 显示结果
-                const resultDiv = document.getElementById('answer-result');
-                resultDiv.style.display = 'flex';
-                
-                if (data.correct) {
-                    correctCount++;
-                    resultDiv.className = 'answer-result correct';
-                    resultDiv.innerHTML = '<i class="fas fa-check-circle"></i> 回答正确！';
-                } else {
-                    wrongCount++;
-                    resultDiv.className = 'answer-result wrong';
-                    resultDiv.innerHTML = `<i class="fas fa-times-circle"></i> 回答错误，正确答案是: ${data.correct_answer.join('')}`;
-                }
-                
-                // 更新计数
-                document.getElementById('correct-num').textContent = correctCount;
-                document.getElementById('wrong-num').textContent = wrongCount;
-                
-                // 切换按钮
-                document.getElementById('submit-btn').style.display = 'none';
-                document.getElementById('next-btn').style.display = 'inline-flex';
-                
-                // 如果是最后一题
-                if (currentQuestionIndex === practiceQuestions.length - 1) {
-                    document.getElementById('next-btn').innerHTML = '查看结果 <i class="fas fa-flag-checkered"></i>';
-                }
-            }
+        // 切换按钮
+        document.getElementById('submit-btn').style.display = 'none';
+        document.getElementById('next-btn').style.display = 'inline-flex';
+        
+        if (currentQuestionIndex === practiceQuestions.length - 1) {
+            document.getElementById('next-btn').innerHTML = '提交试卷 <i class="fas fa-paper-plane"></i>';
+        } else {
+            document.getElementById('next-btn').innerHTML = '下一题 <i class="fas fa-arrow-right"></i>';
         }
-    } catch (error) {
-        showToast('验证答案失败: ' + error.message, 'error');
+    } else {
+        // 刷题模式：显示答案
+        document.querySelectorAll('.option-btn').forEach(btn => {
+            btn.classList.add('disabled');
+            const key = btn.dataset.key;
+            
+            if (correctAnswer.includes(key)) {
+                btn.classList.add('correct');
+            } else if (selectedAnswers.includes(key)) {
+                btn.classList.add('wrong');
+            }
+        });
+        
+        // 显示结果
+        const resultDiv = document.getElementById('answer-result');
+        resultDiv.style.display = 'flex';
+        
+        if (isCorrect) {
+            correctCount++;
+            resultDiv.className = 'answer-result correct';
+            resultDiv.innerHTML = '<i class="fas fa-check-circle"></i> 回答正确！';
+        } else {
+            wrongCount++;
+            resultDiv.className = 'answer-result wrong';
+            resultDiv.innerHTML = `<i class="fas fa-times-circle"></i> 回答错误，正确答案是: ${correctAnswer.join('')}`;
+        }
+        
+        // 更新计数
+        document.getElementById('correct-num').textContent = correctCount;
+        document.getElementById('wrong-num').textContent = wrongCount;
+        
+        // 切换按钮
+        document.getElementById('submit-btn').style.display = 'none';
+        document.getElementById('next-btn').style.display = 'inline-flex';
+        
+        // 如果是最后一题
+        if (currentQuestionIndex === practiceQuestions.length - 1) {
+            document.getElementById('next-btn').innerHTML = '查看结果 <i class="fas fa-flag-checkered"></i>';
+        }
     }
 }
 
@@ -1190,21 +1350,44 @@ function nextQuestion() {
     }
 }
 
-// 计算模拟考试结果
+// 计算模拟考试结果 - 最终判分
 function calculateExamResults() {
     correctCount = 0;
     wrongCount = 0;
-    questionResults.forEach(result => {
-        if (result.answered) {
-            if (result.isCorrect) {
+    
+    questionResults.forEach((result, index) => {
+        const question = practiceQuestions[index];
+        const correctAnswer = question.answer || [];
+        
+        if (result.answered && result.userAnswer.length > 0) {
+            // 判断答案是否正确
+            const isCorrect = arraysEqual(result.userAnswer.sort(), correctAnswer.sort());
+            result.isCorrect = isCorrect;
+            result.correctAnswer = correctAnswer;
+            
+            if (isCorrect) {
                 correctCount++;
             } else {
                 wrongCount++;
+                // 答错添加到错题本
+                addToWrongbook(question.id, result.userAnswer);
             }
         } else {
-            wrongCount++; // 未答题算错
+            // 未答题算错
+            result.isCorrect = false;
+            result.correctAnswer = correctAnswer;
+            wrongCount++;
         }
     });
+}
+
+// 辅助函数：比较两个数组是否相等
+function arraysEqual(a, b) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
 }
 
 function showPracticeResult() {
@@ -1214,11 +1397,12 @@ function showPracticeResult() {
         practiceTimer = null;
     }
     
-    // 计算用时
+    // 计算用时：当前会话时间 + 之前读档的时间
     const endTime = new Date();
-    const timeSpent = Math.floor((endTime - practiceStartTime) / 1000); // 秒
-    const minutes = Math.floor(timeSpent / 60);
-    const seconds = timeSpent % 60;
+    const currentSessionTime = Math.floor((endTime - practiceStartTime) / 1000); // 秒
+    const totalTimeSpent = loadedElapsedTime + currentSessionTime;
+    const minutes = Math.floor(totalTimeSpent / 60);
+    const seconds = totalTimeSpent % 60;
     const timeDisplay = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     
     document.getElementById('practice-area').style.display = 'none';
@@ -1234,6 +1418,15 @@ function showPracticeResult() {
     document.getElementById('result-wrong').textContent = wrongCount;
     document.getElementById('result-rate').textContent = rate + '%';
     document.getElementById('result-time').textContent = timeDisplay;
+    
+    // 完成后删除进度（如果有）
+    if (currentProgressId) {
+        deleteProgress(currentProgressId, true);
+        currentProgressId = null;
+    }
+    
+    // 重置已用时间
+    loadedElapsedTime = 0;
     
     // 渲染答题详情导航
     renderResultNav();
@@ -1653,10 +1846,17 @@ async function startSequencePractice() {
         const data = await response.json();
         
         if (data.success && data.questions.length > 0) {
-            practiceQuestions = data.questions.map(q => ({
-                ...q,
-                shuffledOptions: shuffleOptionsEnabled ? shuffleEntries(Object.entries(q.options || {})) : null
-            }));
+            practiceQuestions = data.questions.map(q => {
+                if (shuffleOptionsEnabled) {
+                    const shuffled = shuffleEntries(Object.entries(q.options || {}), q.answer);
+                    return {
+                        ...q,
+                        shuffledOptions: shuffled.entries,
+                        shuffledAnswer: shuffled.shuffledAnswer
+                    };
+                }
+                return { ...q, shuffledOptions: null, shuffledAnswer: null };
+            });
             
             lastPracticeSettings = { 
                 bank, chapter, 
@@ -1697,10 +1897,17 @@ async function startWrongPractice() {
         const data = await response.json();
         
         if (data.success && data.questions.length > 0) {
-            practiceQuestions = data.questions.map(q => ({
-                ...q,
-                shuffledOptions: shuffleOptionsEnabled ? shuffleEntries(Object.entries(q.options || {})) : null
-            }));
+            practiceQuestions = data.questions.map(q => {
+                if (shuffleOptionsEnabled) {
+                    const shuffled = shuffleEntries(Object.entries(q.options || {}), q.answer);
+                    return {
+                        ...q,
+                        shuffledOptions: shuffled.entries,
+                        shuffledAnswer: shuffled.shuffledAnswer
+                    };
+                }
+                return { ...q, shuffledOptions: null, shuffledAnswer: null };
+            });
             
             lastPracticeSettings = { 
                 bank, chapter: '', 
@@ -1727,6 +1934,11 @@ function initPracticeSession(enableTimer, timeMinutes, examMode) {
     selectedAnswers = [];
     practiceStartTime = new Date();
     isExamMode = examMode;
+    navCurrentPage = 1; // 重置答题卡页码
+    
+    // 重置进度相关变量（新建练习时）
+    currentProgressId = null;
+    loadedElapsedTime = 0;
     
     questionResults = practiceQuestions.map(() => ({
         answered: false,
@@ -1760,6 +1972,11 @@ function initPracticeSession(enableTimer, timeMinutes, examMode) {
     
     renderQuestionNav();
     
+    // 设置计时器（先清除旧的）
+    if (practiceTimer) {
+        clearInterval(practiceTimer);
+        practiceTimer = null;
+    }
     if (enableTimer) {
         remainingTime = timeMinutes * 60;
         document.getElementById('timer-display').style.display = 'flex';
@@ -1992,7 +2209,12 @@ async function saveCurrentProgress() {
         return;
     }
     
+    // 计算已用时间（当前会话时间 + 之前读档的时间）
+    const currentSessionTime = Math.floor((new Date() - practiceStartTime) / 1000);
+    const totalElapsedTime = loadedElapsedTime + currentSessionTime;
+    
     const progressData = {
+        progress_id: currentProgressId, // 如果有ID则覆盖，否则创建新的
         mode: currentPracticeMode,
         bank: lastPracticeSettings?.bank || '',
         chapter: lastPracticeSettings?.chapter || '',
@@ -2002,7 +2224,8 @@ async function saveCurrentProgress() {
         wrong: wrongCount,
         question_ids: practiceQuestions.map(q => q.id),
         question_results: questionResults,
-        remaining_time: remainingTime
+        remaining_time: remainingTime,
+        elapsed_time: totalElapsedTime  // 保存已用时间
     };
     
     try {
@@ -2014,6 +2237,10 @@ async function saveCurrentProgress() {
         const data = await response.json();
         
         if (data.success) {
+            // 更新当前进度ID
+            if (data.progress && data.progress.id) {
+                currentProgressId = data.progress.id;
+            }
             showToast('进度已保存', 'success');
             loadProgressList();
         } else {
@@ -2059,6 +2286,11 @@ async function loadProgress(progressId) {
                 isExamMode = progress.mode === 'exam';
                 remainingTime = progress.remaining_time || 0;
                 practiceStartTime = new Date();
+                navCurrentPage = 1; // 重置答题卡页码
+                
+                // 恢复进度ID和已用时间（用于覆盖保存和计算总用时）
+                currentProgressId = progressId;
+                loadedElapsedTime = progress.elapsed_time || 0;
                 
                 lastPracticeSettings = {
                     bank: progress.bank,
@@ -2085,6 +2317,11 @@ async function loadProgress(progressId) {
                 
                 document.getElementById('score-info').style.display = isExamMode ? 'none' : 'flex';
                 
+                // 设置计时器（先清除旧的）
+                if (practiceTimer) {
+                    clearInterval(practiceTimer);
+                    practiceTimer = null;
+                }
                 if (remainingTime > 0) {
                     document.getElementById('timer-display').style.display = 'flex';
                     updateTimerDisplay();
@@ -2098,8 +2335,8 @@ async function loadProgress(progressId) {
                 
                 showToast('进度已恢复', 'success');
                 
-                // 删除已加载的进度
-                deleteProgress(progressId, true);
+                // 不删除进度，保留用于覆盖更新
+                loadProgressList();
             }
         } else {
             showToast('加载进度失败', 'error');
