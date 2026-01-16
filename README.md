@@ -22,9 +22,6 @@ flowchart LR
     C --> D[(Data<br/>JSON)]
 ```
 
-    Backend --> Data
-
-````
 
 ## 快速开始
 
