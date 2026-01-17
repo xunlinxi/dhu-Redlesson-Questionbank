@@ -112,13 +112,17 @@ body.remote-mode .question-item .btn-danger {
     
     .side-panels {
         width: 270px;
+        min-width: 270px;
+        max-width: 270px;
         flex-direction: column;
         gap: 15px;
     }
     
     .side-panel {
         flex: none;
-        width: 100%;
+        width: 270px;
+        min-width: 270px;
+        max-width: 270px;
     }
 }
 
