@@ -817,10 +817,11 @@ async function startPractice(examMode = false) {
                     return {
                         ...q,
                         shuffledOptions: shuffled.entries,
-                        shuffledAnswer: shuffled.shuffledAnswer
+                        shuffledAnswer: shuffled.shuffledAnswer,
+                        reverseAnswerMap: shuffled.reverseAnswerMap
                     };
                 }
-                return { ...q, shuffledOptions: null, shuffledAnswer: null };
+                return { ...q, shuffledOptions: null, shuffledAnswer: null, reverseAnswerMap: null };
             });
             currentQuestionIndex = 0;
             correctCount = 0;
@@ -1266,10 +1267,12 @@ function shuffleEntries(entries, originalAnswer) {
     // 创建答案映射：原始答案字母 -> 新答案字母
     // 例如原本D是正确答案，D的内容现在在A位置，那么新答案就是A
     const answerMap = {};
+    const reverseAnswerMap = {}; // 新选项 -> 原始选项（用于将用户选择转回原始选项）
     newEntries.forEach(([newKey, value]) => {
         const originalKey = valueToOriginalKey[value];
         if (originalKey) {
             answerMap[originalKey] = newKey;
+            reverseAnswerMap[newKey] = originalKey;
         }
     });
     
@@ -1278,7 +1281,8 @@ function shuffleEntries(entries, originalAnswer) {
     
     return {
         entries: newEntries,
-        shuffledAnswer: shuffledAnswer
+        shuffledAnswer: shuffledAnswer,
+        reverseAnswerMap: reverseAnswerMap // 添加反向映射
     };
 }
 
@@ -1304,8 +1308,8 @@ async function submitAnswer() {
         isCorrect: isCorrect
     };
     
-    // 如果答错，添加到错题本
-    if (!isCorrect) {
+    // 如果答错且非考试模式，添加到错题本（考试模式在calculateExamResults中统一添加）
+    if (!isCorrect && !isExamMode) {
         addToWrongbook(question, selectedAnswers);
     }
     
@@ -1379,17 +1383,23 @@ function nextQuestion() {
     } else {
         // 显示结果
         if (isExamMode) {
-            // 模拟考试模式：先计算所有答案
-            calculateExamResults();
+            // 模拟考试模式：先计算所有答案，等待错题添加完成后再显示结果
+            calculateExamResults().then(() => {
+                showPracticeResult();
+            });
+        } else {
+            showPracticeResult();
         }
-        showPracticeResult();
     }
 }
 
 // 计算模拟考试结果 - 最终判分
-function calculateExamResults() {
+async function calculateExamResults() {
     correctCount = 0;
     wrongCount = 0;
+    
+    // 收集所有错题
+    const wrongQuestions = [];
     
     questionResults.forEach((result, index) => {
         const question = practiceQuestions[index];
@@ -1406,8 +1416,8 @@ function calculateExamResults() {
                 correctCount++;
             } else {
                 wrongCount++;
-                // 答错添加到错题本
-                addToWrongbook(question, result.userAnswer);
+                // 收集错题，稍后逐个添加
+                wrongQuestions.push({ question, userAnswer: result.userAnswer });
             }
         } else {
             // 未答题算错
@@ -1416,6 +1426,11 @@ function calculateExamResults() {
             wrongCount++;
         }
     });
+    
+    // 逐个添加错题到错题本，避免并发写入冲突
+    for (const { question, userAnswer } of wrongQuestions) {
+        await addToWrongbook(question, userAnswer);
+    }
 }
 
 // 辅助函数：比较两个数组是否相等
@@ -1478,7 +1493,7 @@ function showPracticeResult() {
         correct: correctCount,
         wrong: wrongCount,
         accuracy: rate,
-        time_spent: timeSpent,
+        time_spent: totalTimeSpent,
         time_display: timeDisplay
     });
 }
@@ -1510,7 +1525,10 @@ function showResultQuestion(index) {
     const statusClass = result.answered ? (result.isCorrect ? 'correct' : 'wrong') : 'wrong';
     const statusText = result.answered ? (result.isCorrect ? '✓ 正确' : '✗ 错误') : '✗ 未作答';
     
-    let optionsHtml = Object.entries(question.options).map(([key, value]) => {
+    // 使用打乱后的选项顺序（如果有），保证与考试时一致
+    const optionEntries = question.shuffledOptions || Object.entries(question.options);
+    
+    let optionsHtml = optionEntries.map(([key, value]) => {
         const classes = [];
         const isUserSelected = result.userAnswer.includes(key);
         const isCorrectAnswer = result.correctAnswer.includes(key);
@@ -1699,24 +1717,20 @@ function renderRankings(rankings) {
     
     const html = rankings.slice(0, 20).map((item, index) => {
         const rankClass = index < 3 ? `top-${index + 1}` : '';
-        const dateStr = item.date ? new Date(item.date).toLocaleDateString('zh-CN') : '';
+        const name = item.name || '匿名';
+        const correct = item.correct || 0;
+        const total = item.total || 0;
+        const timeDisplay = item.time_display || '00:00';
+        const accuracy = item.accuracy || 0;
         
         return `
             <div class="ranking-item ${rankClass}">
                 <div class="ranking-rank">${index + 1}</div>
                 <div class="ranking-info">
-                    <div class="ranking-name">${escapeHtml(item.name)}</div>
-                    <div class="ranking-details">
-                        <span>${item.correct}/${item.total}题</span>
-                    </div>
+                    <span class="ranking-name">${escapeHtml(name)}</span>
+                    <span class="ranking-meta">${correct}/${total} · ${timeDisplay}</span>
                 </div>
-                <div class="ranking-stats">
-                    <div class="ranking-accuracy">${item.accuracy}%</div>
-                    <div class="ranking-time">
-                        <i class="fas fa-clock"></i> ${item.time_display}
-                    </div>
-                    <div class="ranking-date">${dateStr}</div>
-                </div>
+                <div class="ranking-accuracy">${accuracy}%</div>
             </div>
         `;
     }).join('');
@@ -1889,10 +1903,11 @@ async function startSequencePractice() {
                     return {
                         ...q,
                         shuffledOptions: shuffled.entries,
-                        shuffledAnswer: shuffled.shuffledAnswer
+                        shuffledAnswer: shuffled.shuffledAnswer,
+                        reverseAnswerMap: shuffled.reverseAnswerMap
                     };
                 }
-                return { ...q, shuffledOptions: null, shuffledAnswer: null };
+                return { ...q, shuffledOptions: null, shuffledAnswer: null, reverseAnswerMap: null };
             });
             
             lastPracticeSettings = { 
@@ -1940,10 +1955,11 @@ async function startWrongPractice() {
                     return {
                         ...q,
                         shuffledOptions: shuffled.entries,
-                        shuffledAnswer: shuffled.shuffledAnswer
+                        shuffledAnswer: shuffled.shuffledAnswer,
+                        reverseAnswerMap: shuffled.reverseAnswerMap
                     };
                 }
-                return { ...q, shuffledOptions: null, shuffledAnswer: null };
+                return { ...q, shuffledOptions: null, shuffledAnswer: null, reverseAnswerMap: null };
             });
             
             lastPracticeSettings = { 
@@ -2196,12 +2212,18 @@ function clearWrongQuestionsByBank() {
 // 添加错题到错题本
 async function addToWrongbook(question, userAnswer) {
     try {
+        // 如果有反向映射，将用户的随机选项答案转回原始选项
+        let originalUserAnswer = userAnswer;
+        if (question.reverseAnswerMap) {
+            originalUserAnswer = userAnswer.map(ans => question.reverseAnswerMap[ans] || ans);
+        }
+        
         await fetch(`${API_BASE}/api/wrongbook`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 question_id: question.id,
-                user_answer: userAnswer,
+                user_answer: originalUserAnswer,
                 question: question  // 传递完整题目对象，供远程用户本地存储使用
             })
         });

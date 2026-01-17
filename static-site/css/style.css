@@ -1378,15 +1378,16 @@ select.form-control {
 .ranking-item {
     display: flex;
     align-items: center;
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin-bottom: 4px;
     background: var(--bg-color);
     transition: transform 0.2s, box-shadow 0.2s;
+    gap: 8px;
 }
 
 .ranking-item:hover {
-    transform: translateX(5px);
+    transform: translateX(3px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -1406,15 +1407,15 @@ select.form-control {
 }
 
 .ranking-rank {
-    width: 32px;
-    height: 32px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
     font-weight: bold;
-    font-size: 14px;
-    margin-right: 12px;
+    font-size: 11px;
+    flex-shrink: 0;
     background: var(--card-bg);
     color: var(--text-color);
 }
@@ -1437,44 +1438,30 @@ select.form-control {
 .ranking-info {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .ranking-name {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-color);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.ranking-details {
-    display: flex;
-    gap: 10px;
-    font-size: 12px;
+.ranking-meta {
+    font-size: 11px;
     color: var(--text-secondary);
-    margin-top: 4px;
-}
-
-.ranking-stats {
-    text-align: right;
 }
 
 .ranking-accuracy {
-    font-size: 18px;
+    font-size: 14px;
     font-weight: bold;
     color: var(--primary-color);
-}
-
-.ranking-time {
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-
-.ranking-date {
-    font-size: 11px;
-    color: #999;
-    margin-top: 2px;
+    flex-shrink: 0;
 }
 
 /* 响应式适配 */

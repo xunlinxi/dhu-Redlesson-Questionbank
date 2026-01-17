@@ -277,10 +277,26 @@
             
             // 排行榜相关
             else if (apiPath === '/api/rankings' && method === 'GET') {
-                result = Rankings.getAll();
+                const data = Rankings.getAll();
+                // 转换字段名以兼容前端期望的格式
+                const rankings = (data.rankings || []).map(r => ({
+                    name: r.playerName || r.name || '匿名',
+                    total: r.totalCount || r.total || 0,
+                    correct: r.correctCount || r.correct || 0,
+                    wrong: (r.totalCount || r.total || 0) - (r.correctCount || r.correct || 0),
+                    accuracy: r.accuracy || 0,
+                    time_spent: r.duration || r.time_spent || 0,
+                    time_display: r.timeDisplay || r.time_display || '',
+                    date: r.createTime || r.date || new Date().toISOString()
+                }));
+                result = { success: true, rankings: rankings };
             }
             else if (apiPath === '/api/rankings' && method === 'POST') {
                 Rankings.add(body);
+                result = { success: true };
+            }
+            else if (apiPath === '/api/rankings' && method === 'DELETE') {
+                Rankings.clear();
                 result = { success: true };
             }
             

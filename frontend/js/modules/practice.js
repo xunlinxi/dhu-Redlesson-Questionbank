@@ -837,7 +837,10 @@ function showResultQuestion(index) {
     const statusClass = result.answered ? (result.isCorrect ? 'correct' : 'wrong') : 'wrong';
     const statusText = result.answered ? (result.isCorrect ? '✓ 正确' : '✗ 错误') : '✗ 未作答';
     
-    let optionsHtml = Object.entries(question.options).map(([key, value]) => {
+    // 使用打乱后的选项顺序（如果有），保证与考试时一致
+    const optionEntries = question.shuffledOptions || Object.entries(question.options);
+    
+    let optionsHtml = optionEntries.map(([key, value]) => {
         const classes = [];
         const isUserSelected = result.userAnswer.includes(key);
         const isCorrectAnswer = result.correctAnswer.includes(key);

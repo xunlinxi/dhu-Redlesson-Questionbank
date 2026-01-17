@@ -12,25 +12,32 @@ const Rankings = {
 
     /**
      * 添加成绩记录
+     * 兼容两种格式：
+     * 格式1（后端格式）: { name, total, correct, wrong, accuracy, time_spent, time_display }
+     * 格式2（静态格式）: { playerName, bankName, score, correctCount, totalCount, accuracy, duration, mode }
      */
     add(record) {
         const data = this.getAll();
         
-        data.rankings.push({
+        // 兼容两种数据格式
+        const newRecord = {
             id: Date.now().toString(),
-            playerName: record.playerName || Storage.getPlayerName(),
-            bankName: record.bankName,
-            score: record.score,
-            correctCount: record.correctCount,
-            totalCount: record.totalCount,
-            accuracy: record.accuracy,
-            duration: record.duration,
+            playerName: record.playerName || record.name || Storage.getPlayerName() || '匿名',
+            bankName: record.bankName || '综合',
+            score: record.score || record.correct || 0,
+            correctCount: record.correctCount || record.correct || 0,
+            totalCount: record.totalCount || record.total || 0,
+            accuracy: record.accuracy || 0,
+            duration: record.duration || record.time_spent || 0,
+            timeDisplay: record.time_display || '',
             mode: record.mode || 'practice',
             createTime: new Date().toISOString()
-        });
+        };
         
-        // 按分数排序，保留最近100条
-        data.rankings.sort((a, b) => b.score - a.score);
+        data.rankings.push(newRecord);
+        
+        // 按正确率排序，保留最近100条
+        data.rankings.sort((a, b) => b.accuracy - a.accuracy);
         data.rankings = data.rankings.slice(0, 100);
         
         Storage.setRankings(data);
