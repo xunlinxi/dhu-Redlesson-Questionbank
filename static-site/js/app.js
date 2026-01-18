@@ -2281,6 +2281,19 @@ async function saveCurrentProgress() {
     const currentSessionTime = Math.floor((new Date() - practiceStartTime) / 1000);
     const totalElapsedTime = loadedElapsedTime + currentSessionTime;
     
+    // 只保存乱序映射信息（大幅减少存储空间）
+    // shuffleMap: { questionId: { shuffledOptions, shuffledAnswer, reverseAnswerMap } }
+    const shuffleMap = {};
+    practiceQuestions.forEach(q => {
+        if (q.shuffledOptions || q.shuffledAnswer || q.reverseAnswerMap) {
+            shuffleMap[q.id] = {
+                shuffledOptions: q.shuffledOptions,
+                shuffledAnswer: q.shuffledAnswer,
+                reverseAnswerMap: q.reverseAnswerMap
+            };
+        }
+    });
+    
     const progressData = {
         progress_id: currentProgressId, // 如果有ID则覆盖，否则创建新的
         mode: currentPracticeMode,
@@ -2291,6 +2304,7 @@ async function saveCurrentProgress() {
         correct: correctCount,
         wrong: wrongCount,
         question_ids: practiceQuestions.map(q => q.id),
+        shuffle_map: shuffleMap,  // 只保存乱序映射（替代完整 questions）
         question_results: questionResults,
         remaining_time: remainingTime,
         elapsed_time: totalElapsedTime  // 保存已用时间
@@ -2324,96 +2338,129 @@ async function loadProgress(progressId) {
         const response = await fetch(`${API_BASE}/api/progress/${progressId}`);
         const data = await response.json();
         
-        if (data.success) {
+        if (data.success && data.progress) {
             const progress = data.progress;
             
-            // 重新加载题目
+            // 从 API 加载题目
             const questionIds = progress.question_ids || [];
+            if (questionIds.length === 0) {
+                showToast('存档数据损坏：无题目信息', 'error');
+                return;
+            }
+            
             const questionsResponse = await fetch(`${API_BASE}/api/questions`);
             const questionsData = await questionsResponse.json();
             
-            if (questionsData.success) {
-                // 按保存的顺序恢复题目
-                const questionMap = {};
-                questionsData.questions.forEach(q => { questionMap[q.id] = q; });
-                
-                practiceQuestions = questionIds.map(id => questionMap[id]).filter(q => q);
-                
-                if (practiceQuestions.length === 0) {
-                    showToast('进度中的题目已被删除', 'error');
-                    return;
-                }
-                
-                currentQuestionIndex = progress.current_index || 0;
-                correctCount = progress.correct || 0;
-                wrongCount = progress.wrong || 0;
-                questionResults = progress.question_results || practiceQuestions.map(() => ({
-                    answered: false, userAnswer: [], correctAnswer: [], isCorrect: null
-                }));
-                currentPracticeMode = progress.mode || 'random';
-                isExamMode = progress.mode === 'exam';
-                remainingTime = progress.remaining_time || 0;
-                practiceStartTime = new Date();
-                navCurrentPage = 1; // 重置答题卡页码
-                
-                // 恢复进度ID和已用时间（用于覆盖保存和计算总用时）
-                currentProgressId = progressId;
-                loadedElapsedTime = progress.elapsed_time || 0;
-                
-                lastPracticeSettings = {
-                    bank: progress.bank,
-                    chapter: progress.chapter,
-                    mode: progress.mode
-                };
-                
-                // 显示练习界面
-                document.getElementById('practice-settings').style.display = 'none';
-                document.getElementById('practice-area').style.display = 'block';
-                document.getElementById('practice-result').style.display = 'none';
-                document.getElementById('practice-header-info').style.display = 'flex';
-                
-                // 显示并展开答题卡
-                const navPanel = document.getElementById('question-nav-panel');
-                navPanel.style.display = 'block';
-                navPanel.classList.remove('collapsed');
-                navPanel.classList.add('expanded');
-                
-                // 进入刷题后折叠排行榜面板
-                document.getElementById('ranking-panel-wrapper').classList.add('collapsed');
-                
-                const modeBadge = document.getElementById('practice-mode-badge');
-                const modeTexts = {
-                    'random': '刷题模式',
-                    'exam': '模拟考试',
-                    'sequence': '顺序做题',
-                    'wrong': '错题练习'
-                };
-                modeBadge.textContent = modeTexts[currentPracticeMode] || '刷题模式';
-                modeBadge.className = `practice-mode-badge ${currentPracticeMode}`;
-                
-                document.getElementById('score-info').style.display = isExamMode ? 'none' : 'flex';
-                
-                // 设置计时器（先清除旧的）
-                if (practiceTimer) {
-                    clearInterval(practiceTimer);
-                    practiceTimer = null;
-                }
-                if (remainingTime > 0) {
-                    document.getElementById('timer-display').style.display = 'flex';
-                    updateTimerDisplay();
-                    practiceTimer = setInterval(updateTimer, 1000);
-                } else {
-                    document.getElementById('timer-display').style.display = 'none';
-                }
-                
-                renderQuestionNav();
-                renderQuestion();
-                
-                showToast('进度已恢复', 'success');
-                
-                // 不删除进度，保留用于覆盖更新
-                loadProgressList();
+            if (!questionsData.success || !questionsData.questions) {
+                showToast('加载题目失败', 'error');
+                return;
             }
+            
+            const questionMap = {};
+            questionsData.questions.forEach(q => { questionMap[q.id] = q; });
+            practiceQuestions = questionIds.map(id => questionMap[id]).filter(q => q);
+            
+            if (practiceQuestions.length === 0) {
+                showToast('进度中的题目已被删除', 'error');
+                return;
+            }
+            
+            // 应用保存的乱序映射（新格式）
+            const shuffleMap = progress.shuffle_map || {};
+            practiceQuestions = practiceQuestions.map(q => {
+                const shuffle = shuffleMap[q.id];
+                if (shuffle) {
+                    return {
+                        ...q,
+                        shuffledOptions: shuffle.shuffledOptions,
+                        shuffledAnswer: shuffle.shuffledAnswer,
+                        reverseAnswerMap: shuffle.reverseAnswerMap
+                    };
+                }
+                // 兼容旧格式：从 questions 数组获取乱序信息
+                if (progress.questions && Array.isArray(progress.questions)) {
+                    const savedQ = progress.questions.find(sq => sq.id === q.id);
+                    if (savedQ) {
+                        return {
+                            ...q,
+                            shuffledOptions: savedQ.shuffledOptions,
+                            shuffledAnswer: savedQ.shuffledAnswer,
+                            reverseAnswerMap: savedQ.reverseAnswerMap
+                        };
+                    }
+                }
+                return q;
+            });
+            
+            currentQuestionIndex = progress.current_index || 0;
+            correctCount = progress.correct || 0;
+            wrongCount = progress.wrong || 0;
+            questionResults = progress.question_results || practiceQuestions.map(() => ({
+                answered: false, userAnswer: [], correctAnswer: [], isCorrect: null
+            }));
+            currentPracticeMode = progress.mode || 'random';
+            isExamMode = progress.mode === 'exam';
+            remainingTime = progress.remaining_time || 0;
+            practiceStartTime = new Date();
+            navCurrentPage = 1; // 重置答题卡页码
+            
+            // 恢复进度ID和已用时间（用于覆盖保存和计算总用时）
+            currentProgressId = progressId;
+            loadedElapsedTime = progress.elapsed_time || 0;
+            
+            lastPracticeSettings = {
+                bank: progress.bank,
+                chapter: progress.chapter,
+                mode: progress.mode
+            };
+            
+            // 显示练习界面
+            document.getElementById('practice-settings').style.display = 'none';
+            document.getElementById('practice-area').style.display = 'block';
+            document.getElementById('practice-result').style.display = 'none';
+            document.getElementById('practice-header-info').style.display = 'flex';
+            
+            // 显示并展开答题卡
+            const navPanel = document.getElementById('question-nav-panel');
+            navPanel.style.display = 'block';
+            navPanel.classList.remove('collapsed');
+            navPanel.classList.add('expanded');
+            
+            // 进入刷题后折叠排行榜面板
+            document.getElementById('ranking-panel-wrapper').classList.add('collapsed');
+            
+            const modeBadge = document.getElementById('practice-mode-badge');
+            const modeTexts = {
+                'random': '刷题模式',
+                'exam': '模拟考试',
+                'sequence': '顺序做题',
+                'wrong': '错题练习'
+            };
+            modeBadge.textContent = modeTexts[currentPracticeMode] || '刷题模式';
+            modeBadge.className = `practice-mode-badge ${currentPracticeMode}`;
+            
+            document.getElementById('score-info').style.display = isExamMode ? 'none' : 'flex';
+            
+            // 设置计时器（先清除旧的）
+            if (practiceTimer) {
+                clearInterval(practiceTimer);
+                practiceTimer = null;
+            }
+            if (remainingTime > 0) {
+                document.getElementById('timer-display').style.display = 'flex';
+                updateTimerDisplay();
+                practiceTimer = setInterval(updateTimer, 1000);
+            } else {
+                document.getElementById('timer-display').style.display = 'none';
+            }
+            
+            renderQuestionNav();
+            renderQuestion();
+            
+            showToast('进度已恢复', 'success');
+            
+            // 不删除进度，保留用于覆盖更新
+            loadProgressList();
         } else {
             showToast('加载进度失败', 'error');
         }

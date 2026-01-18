@@ -305,8 +305,8 @@
                 result = Progress.getAll();
             }
             else if (apiPath === '/api/progress' && method === 'POST') {
-                const id = Progress.save(body);
-                result = { success: true, id: id };
+                const saveResult = Progress.save(body);
+                result = { success: true, progress: saveResult.progress };
             }
             else if (apiPath.match(/^\/api\/progress\/[^\/]+$/) && method === 'GET') {
                 const progressId = apiPath.split('/').pop();

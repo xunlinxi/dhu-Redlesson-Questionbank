@@ -54,6 +54,7 @@ class ProgressModel:
             "correct": progress_data.get('correct', 0),
             "wrong": progress_data.get('wrong', 0),
             "question_ids": progress_data.get('question_ids', []),
+            "shuffle_map": progress_data.get('shuffle_map', {}),  # 乱序映射（轻量级）
             "question_results": progress_data.get('question_results', []),
             "remaining_time": progress_data.get('remaining_time', 0),
             "elapsed_time": progress_data.get('elapsed_time', 0),
