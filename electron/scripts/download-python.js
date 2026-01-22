@@ -160,12 +160,8 @@ function verifyPython(pythonExe) {
         const version = execSync(`"${pythonExe}" --version`, { encoding: 'utf-8' });
         console.log(`✅ Python 版本: ${version.trim()}`);
 
-        const testCode = 'import sys; print("Python works!")';
-        // Windows 下需要特殊处理引号
-        const escapedCode = process.platform === 'win32'
-            ? `import sys; print(^"Python works!^")`
-            : testCode;
-        const output = execSync(`"${pythonExe}" -c "${escapedCode}"`, { encoding: 'utf-8' });
+        const testCode = "import sys; print('Python works!')";
+        const output = execSync(`"${pythonExe}" -c "${testCode}"`, { encoding: 'utf-8' });
         console.log(`✅ Python 测试: ${output.trim()}`);
 
         return true;
