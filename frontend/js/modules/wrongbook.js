@@ -3,8 +3,9 @@
 // 加载错题题库列表
 async function loadWrongBanks() {
     try {
-        const response = await fetch(`${API_BASE}/api/wrongbook/stats`);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.getWrongbookStats() :
+            await (await fetch(`${API_BASE}/api/wrongbook/stats`)).json();
         
         const bankList = document.getElementById('wrong-bank-list');
         
@@ -66,8 +67,9 @@ async function browseWrongBank(bankName) {
 // 加载错题列表
 async function loadWrongQuestions(bankName) {
     try {
-        const response = await fetch(`${API_BASE}/api/wrongbook?bank=${encodeURIComponent(bankName)}`);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.getWrongbook(bankName) :
+            await (await fetch(`${API_BASE}/api/wrongbook?bank=${encodeURIComponent(bankName)}`)).json();
         
         const questionList = document.getElementById('wrong-question-list');
         
@@ -118,10 +120,9 @@ async function loadWrongQuestions(bankName) {
 // 从错题本移除
 async function removeFromWrongbook(questionId) {
     try {
-        const response = await fetch(`${API_BASE}/api/wrongbook/${questionId}`, {
-            method: 'DELETE'
-        });
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.removeWrongQuestion(questionId) :
+            await (await fetch(`${API_BASE}/api/wrongbook/${questionId}`, { method: 'DELETE' })).json();
         
         if (data.success) {
             showToast('已从错题本移除', 'success');
@@ -169,15 +170,17 @@ function clearWrongQuestionsByBank() {
 // 添加错题到错题本
 async function addToWrongbook(question, userAnswer) {
     try {
-        await fetch(`${API_BASE}/api/wrongbook`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                question_id: question.id,
-                user_answer: userAnswer,
-                question: question  // 传递完整题目对象，供远程用户本地存储使用
-            })
-        });
+        const data = isElectron ?
+            await window.electronAPI.addWrongQuestion({ questionId: question.id, user_answer: userAnswer, question }) :
+            await (await fetch(`${API_BASE}/api/wrongbook`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question_id: question.id,
+                    user_answer: userAnswer,
+                    question: question
+                })
+            })).json();
     } catch (error) {
         console.error('添加错题失败:', error);
     }

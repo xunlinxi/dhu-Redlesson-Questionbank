@@ -4,8 +4,9 @@
 
 async function loadStats() {
     try {
-        const response = await fetch(`${API_BASE}/api/stats`);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.getStats() :
+            await (await fetch(`${API_BASE}/api/stats`)).json();
         
         if (data.success) {
             const stats = data.stats;
@@ -21,8 +22,10 @@ async function loadStats() {
 
 async function loadBankChapters() {
     try {
-        const response = await fetch(`${API_BASE}/api/stats/by_bank`);
-        const data = await response.json();
+        // 暂时复用 getQuestions 获取统计数据
+        const data = isElectron ?
+            await window.electronAPI.getQuestions() :
+            await (await fetch(`${API_BASE}/api/stats/by_bank`)).json();
         
         const container = document.getElementById('bank-chapters-container');
         if (!container) return;

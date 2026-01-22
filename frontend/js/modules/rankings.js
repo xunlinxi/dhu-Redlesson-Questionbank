@@ -3,8 +3,9 @@
 // 加载排名
 async function loadRankings() {
     try {
-        const response = await fetch(`${API_BASE}/api/rankings`);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.getRankings() :
+            await (await fetch(`${API_BASE}/api/rankings`)).json();
         
         if (data.success) {
             renderRankings(data.rankings);
@@ -62,13 +63,13 @@ function renderRankings(rankings) {
 // 保存排名
 async function saveRanking(record) {
     try {
-        const response = await fetch(`${API_BASE}/api/rankings`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(record)
-        });
-        
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.addRanking(record) :
+            await (await fetch(`${API_BASE}/api/rankings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(record)
+            })).json();
         
         if (data.success) {
             loadRankings();
@@ -85,11 +86,9 @@ async function clearRankings() {
         '确定要清空所有排名记录吗？此操作不可恢复。',
         async () => {
             try {
-                const response = await fetch(`${API_BASE}/api/rankings`, {
-                    method: 'DELETE'
-                });
-                
-                const data = await response.json();
+                const data = isElectron ?
+                    await window.electronAPI.clearRankings() :
+                    await (await fetch(`${API_BASE}/api/rankings`, { method: 'DELETE' })).json();
                 
                 if (data.success) {
                     showToast('排名已清空', 'success');

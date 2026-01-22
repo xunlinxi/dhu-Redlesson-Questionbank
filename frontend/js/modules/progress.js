@@ -66,12 +66,13 @@ async function saveCurrentProgress() {
     };
     
     try {
-        const response = await fetch(`${API_BASE}/api/progress`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(progressData)
-        });
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.saveProgress(progressData) :
+            await (await fetch(`${API_BASE}/api/progress`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(progressData)
+            })).json();
         
         if (data.success) {
             // 更新当前进度ID
@@ -99,8 +100,9 @@ async function loadProgress(progressId) {
             
             // 重新加载题目
             const questionIds = progress.question_ids || [];
-            const questionsResponse = await fetch(`${API_BASE}/api/questions`);
-            const questionsData = await questionsResponse.json();
+            const questionsData = isElectron ?
+                await window.electronAPI.getQuestions() :
+                await (await fetch(`${API_BASE}/api/questions`)).json();
             
             if (questionsData.success) {
                 // 按保存的顺序恢复题目
@@ -195,10 +197,9 @@ async function loadProgress(progressId) {
 // 删除进度
 async function deleteProgress(progressId, silent = false) {
     try {
-        const response = await fetch(`${API_BASE}/api/progress/${progressId}`, {
-            method: 'DELETE'
-        });
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.deleteProgress(progressId) :
+            await (await fetch(`${API_BASE}/api/progress/${progressId}`, { method: 'DELETE' })).json();
         
         if (data.success) {
             if (!silent) {

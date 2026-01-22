@@ -3,8 +3,9 @@
 // 加载题库列表
 async function loadBanks() {
     try {
-        const response = await fetch(`${API_BASE}/api/banks`);
-        const data = await response.json();
+        const data = isElectron ? 
+            await window.electronAPI.getBanks() :
+            await (await fetch(`${API_BASE}/api/banks`)).json();
         
         const bankList = document.getElementById('bank-list');
         
@@ -79,8 +80,9 @@ async function browseBank(bankName) {
 // 加载章节列表
 async function loadChapters(bankName) {
     try {
-        const response = await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bankName)}`);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.getChapters(bankName) :
+            await (await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bankName)}`)).json();
         
         const select = document.getElementById('filter-chapter');
         select.innerHTML = '<option value="">全部章节</option>';
@@ -100,13 +102,10 @@ async function loadQuestions() {
     const type = document.getElementById('filter-type').value;
     const chapter = document.getElementById('filter-chapter').value;
     
-    let url = `${API_BASE}/api/questions?bank=${encodeURIComponent(currentBankName)}`;
-    if (type) url += `&type=${type}`;
-    if (chapter) url += `&chapter=${encodeURIComponent(chapter)}`;
-    
     try {
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.getQuestions({ bank: currentBankName, type, chapter }) :
+            (await fetch(`${API_BASE}/api/questions?bank=${encodeURIComponent(currentBankName)}${type ? `&type=${type}` : ''}${chapter ? `&chapter=${encodeURIComponent(chapter)}` : ''}`)).json();
         
         const questionList = document.getElementById('question-list');
         
@@ -176,10 +175,9 @@ function confirmDeleteBank(bankName) {
         `确定要删除题库"${bankName}"吗？该操作不可恢复。`,
         async () => {
             try {
-                const response = await fetch(`${API_BASE}/api/banks/${encodeURIComponent(bankName)}`, {
-                    method: 'DELETE'
-                });
-                const data = await response.json();
+                const data = isElectron ?
+                    await window.electronAPI.deleteBank(bankName) :
+                    await (await fetch(`${API_BASE}/api/banks/${encodeURIComponent(bankName)}`, { method: 'DELETE' })).json();
                 
                 if (data.success) {
                     showToast(data.message, 'success');
@@ -202,10 +200,9 @@ function confirmDeleteQuestion(questionId) {
         '确定要删除这道题目吗？该操作不可恢复。',
         async () => {
             try {
-                const response = await fetch(`${API_BASE}/api/questions/${questionId}`, {
-                    method: 'DELETE'
-                });
-                const data = await response.json();
+                const data = isElectron ?
+                    await window.electronAPI.deleteQuestion(questionId) :
+                    await (await fetch(`${API_BASE}/api/questions/${questionId}`, { method: 'DELETE' })).json();
                 
                 if (data.success) {
                     showToast('题目已删除', 'success');
@@ -224,8 +221,9 @@ function confirmDeleteQuestion(questionId) {
 // 编辑题目
 async function editQuestion(questionId) {
     try {
-        const response = await fetch(`${API_BASE}/api/questions/${questionId}`);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.getQuestion(questionId) :
+            await (await fetch(`${API_BASE}/api/questions/${questionId}`)).json();
         
         if (data.success) {
             const q = data.question;
@@ -278,13 +276,13 @@ async function saveQuestion() {
     };
     
     try {
-        const response = await fetch(`${API_BASE}/api/questions/${editingQuestionId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData)
-        });
-        
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.updateQuestion(editingQuestionId, updateData) :
+            await (await fetch(`${API_BASE}/api/questions/${editingQuestionId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            })).json();
         
         if (data.success) {
             showToast('题目已更新', 'success');

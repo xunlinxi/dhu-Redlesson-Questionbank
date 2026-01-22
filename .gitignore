@@ -4,9 +4,9 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
+/build/
 develop-eggs/
-dist/
+/dist/
 downloads/
 eggs/
 .eggs/
@@ -64,3 +64,9 @@ temp/
 
 # 测试文件
 tests/
+
+# Electron
+electron/node_modules/
+electron/python/
+electron/dist/
+electron/package-lock.json

@@ -1,0 +1,51 @@
+# Windows 打包配置
+# 参考: https://www.electron.build/configuration/win
+
+appId: com.dhu.quiz
+productName: 东华红课题库刷题系统
+
+directories:
+  output: dist
+  buildResources: assets
+
+files:
+  - from: .
+    filter:
+      - '!node_modules/**'
+      - '!dist/**'
+      - '!scripts/**'
+      - '!.gitignore'
+      - '!.git/**'
+      - '!.vscode/**'
+      - '!*.md'
+      - '!*.zip'
+      - '!python/test_imports.py'
+
+asar: true
+
+win:
+  target: nsis
+  icon: assets/icon.ico
+  artifactName: 东华红课题库刷题系统-${version}-${os}.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 东华红课题库刷题系统
+
+mac:
+  target: dmg
+  icon: assets/icon.icns
+
+linux:
+  target: AppImage
+  icon: assets/icons/
+
+publish:
+  provider: github
+  owner: dhu-quiz
+  repo: dhu-Redlesson-Questionbank

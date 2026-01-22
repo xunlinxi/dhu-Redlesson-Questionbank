@@ -2,7 +2,9 @@
  * 题库刷题系统前端逻辑
  */
 
-const API_BASE = '';
+// 检测是否在 Electron 环境中
+const isElectron = window.electronAPI !== undefined;
+const API_BASE = isElectron ? '' : '';
 
 // ==================== 全局状态 ====================
 let currentPage = 'dashboard';
@@ -31,16 +33,22 @@ let navCurrentPage = 1; // 答题卡当前页码
 const NAV_PAGE_SIZE = 56; // 答题卡每页显示数量
 
 // ==================== 初始化 ====================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     initNavigation();
     initUpload();
-    loadStats();
-    loadConfig();
-    startHealthCheck();
-    
+    await loadConfig();
+
+    // Electron 环境不需要健康检查
+    if (!isElectron) {
+        startHealthCheck();
+    } else {
+        serverOnline = true;
+        await loadStats();
+    }
+
     // 设置初始页面属性
     document.body.setAttribute('data-page', 'dashboard');
-    
+
     // 暴露函数到全局作用域（用于onclick调用）
     window.changeNavPage = changeNavPage;
     window.togglePanel = togglePanel;
@@ -64,24 +72,36 @@ function startHealthCheck() {
 
 async function checkServerHealth() {
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
-        
-        const response = await fetch(`${API_BASE}/api/health`, {
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
+        if (isElectron) {
+            // Electron 环境
+            await window.electronAPI.healthCheck();
             if (!serverOnline) {
                 serverOnline = true;
                 hideServerError();
-                showToast('服务器连接已恢复', 'success');
-                // 重新加载当前页面数据
+                showToast('系统连接已恢复', 'success');
                 switchPage(currentPage);
             }
         } else {
-            handleServerOffline();
+            // Web 环境
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+            const response = await fetch(`${API_BASE}/api/health`, {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                if (!serverOnline) {
+                    serverOnline = true;
+                    hideServerError();
+                    showToast('服务器连接已恢复', 'success');
+                    // 重新加载当前页面数据
+                    switchPage(currentPage);
+                }
+            } else {
+                handleServerOffline();
+            }
         }
     } catch (error) {
         handleServerOffline();

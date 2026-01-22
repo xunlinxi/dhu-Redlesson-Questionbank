@@ -3,8 +3,9 @@
 // 加载刷题选项
 async function loadPracticeOptions() {
     try {
-        const response = await fetch(`${API_BASE}/api/banks`);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.getBanks() :
+            await (await fetch(`${API_BASE}/api/banks`)).json();
         
         const select = document.getElementById('practice-bank');
         select.innerHTML = '<option value="">全部题库</option>';
@@ -36,8 +37,9 @@ async function loadPracticeChapters() {
     
     if (bank) {
         try {
-            const response = await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bank)}`);
-            const data = await response.json();
+            const data = isElectron ?
+                await window.electronAPI.getChapters(bank) :
+                await (await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bank)}`)).json();
             
             if (data.success) {
                 data.chapters.forEach(chapter => {
@@ -69,13 +71,10 @@ async function updateAvailableStats() {
         // 获取题目统计
         let singleCount = 0;
         let multiCount = 0;
-        
-        let questionsUrl = `${API_BASE}/api/questions?`;
-        if (bank) questionsUrl += `bank=${encodeURIComponent(bank)}&`;
-        if (chapter) questionsUrl += `chapter=${encodeURIComponent(chapter)}&`;
-        
-        const response = await fetch(questionsUrl);
-        const data = await response.json();
+
+        const data = isElectron ?
+            await window.electronAPI.getQuestions({ bank, chapter }) :
+            await (await fetch(`${API_BASE}/api/questions?bank=${encodeURIComponent(bank)}${chapter ? `&chapter=${encodeURIComponent(chapter)}` : ''}`)).json();
         
         if (data.success) {
             data.questions.forEach(q => {
@@ -134,8 +133,9 @@ async function startPractice(examMode = false) {
     if (chapter) url += `&chapter=${encodeURIComponent(chapter)}`;
     
     try {
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.practiceRandom({ bank, chapter, single_count: singleCount, multi_count: multiCount }) :
+            await (await fetch(url)).json();
         
         if (data.success && data.questions.length > 0) {
             practiceQuestions = data.questions.map(q => {
