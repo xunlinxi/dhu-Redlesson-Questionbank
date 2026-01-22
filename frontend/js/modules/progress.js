@@ -3,12 +3,17 @@
 // 加载进度列表
 async function loadProgressList() {
     try {
-        const response = await fetch(`${API_BASE}/api/progress`);
-        const data = await response.json();
-        
+        let data;
+        if (isElectron) {
+            data = await window.electronAPI.getProgress();
+        } else {
+            const response = await fetch(`${API_BASE}/api/progress`);
+            data = await response.json();
+        }
+
         const container = document.getElementById('progress-list');
         if (!container) return;
-        
+
         if (data.success && data.progress_list.length > 0) {
             container.innerHTML = data.progress_list.map(p => {
                 const modeNames = {

@@ -146,14 +146,9 @@ function startPythonProcess() {
             console.error('💡 请确保 Python 已正确安装');
         });
 
-        // 只在初始化时注册一次输出监听器
-        pythonProcess.stdout.on('data', (data) => {
-            console.log('Python output:', data.toString());
-        });
-
         pythonProcess.stderr.on('data', (data) => {
             const errorMsg = data.toString();
-            console.error('Python error:', errorMsg);
+            console.error('Python stderr:', errorMsg);
         });
     } else {
         console.error('❌ Python 脚本不存在:', pythonScript);
@@ -500,7 +495,14 @@ ipcMain.handle('save-config', async (event, config) => {
 
 // 导入题库
 ipcMain.handle('import-questions', async (event, filePath, bankName) => {
+    console.log('📨 收到导入请求 - filePath:', filePath, 'bankName:', bankName);
     try {
+        // 检查文件路径
+        if (!filePath) {
+            console.error('❌ 文件路径为空！');
+            return { success: false, error: '文件路径为空，请先选择文件' };
+        }
+
         // 使用 Python 解析器
         const parseResult = await parseWithPython(filePath);
 
@@ -532,6 +534,7 @@ ipcMain.handle('import-questions', async (event, filePath, bankName) => {
             question_count: parseResult.questions.length
         };
     } catch (error) {
+        console.error('❌ 导入失败:', error);
         return { success: false, error: error.message };
     }
 });
@@ -598,33 +601,46 @@ ipcMain.handle('import-data', async (event, filePath) => {
 function parseWithPython(filePath) {
     return new Promise((resolve, reject) => {
         if (!pythonProcess) {
+            console.error('❌ Python 进程未运行');
             resolve({ success: false, error: 'Python 进程未运行' });
             return;
         }
+
+        console.log('📤 开始解析文件:', filePath);
+        console.log('🔍 Python 进程状态:', {
+            pid: pythonProcess.pid,
+            connected: pythonProcess.connected,
+            killed: pythonProcess.killed
+        });
 
         const input = JSON.stringify({ action: 'parse', file_path: filePath });
         let output = '';
         let timeout;
 
-        // 使用 once 只接收一次响应，避免重复监听
+        // 监听 stdout
         const onData = (data) => {
-            output += data.toString();
+            const chunk = data.toString();
+            output += chunk;
+            console.log('📥 Python stdout:', chunk);
 
             // 尝试解析是否收到完整 JSON
             try {
                 const result = JSON.parse(output);
+                console.log('✅ 解析成功:', result);
                 clearTimeout(timeout);
+                pythonProcess.stdout.removeListener('data', onData);
                 resolve(result);
             } catch (e) {
-                // JSON 还不完整，继续等待
+                console.log('⏳ JSON 解析中，继续等待...');
             }
         };
 
-        pythonProcess.stdout.once('data', onData);
+        pythonProcess.stdout.on('data', onData);
 
         // 设置超时（30 秒）
         timeout = setTimeout(() => {
             pythonProcess.stdout.removeListener('data', onData);
+            console.error('⏰ 超时！已接收数据:', output);
             if (output) {
                 reject(new Error('解析超时，请检查文件格式'));
             } else {
@@ -633,6 +649,19 @@ function parseWithPython(filePath) {
         }, 30000);
 
         // 发送命令
-        pythonProcess.stdin.write(input + '\n');
+        console.log('📨 发送命令到 Python:', input);
+        try {
+            pythonProcess.stdin.write(input + '\n', (err) => {
+                if (err) {
+                    console.error('❌ 发送命令失败:', err);
+                    reject(new Error('发送命令失败: ' + err.message));
+                } else {
+                    console.log('✅ 命令已发送');
+                }
+            });
+        } catch (err) {
+            console.error('❌ 发送命令异常:', err);
+            reject(new Error('发送命令异常: ' + err.message));
+        }
     });
 }

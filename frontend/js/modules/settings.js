@@ -3,12 +3,17 @@
 // 加载配置
 async function loadConfig() {
     try {
-        const response = await fetch(`${API_BASE}/api/config`);
-        const data = await response.json();
-        
+        let data;
+        if (isElectron) {
+            data = await window.electronAPI.getConfig();
+        } else {
+            const response = await fetch(`${API_BASE}/api/config`);
+            data = await response.json();
+        }
+
         if (data.success) {
             document.getElementById('data-path').value = data.config.data_path || '';
-            document.getElementById('current-data-file').textContent = 
+            document.getElementById('current-data-file').textContent =
                 data.config.data_path + '/' + data.config.questions_file;
         }
     } catch (error) {
@@ -19,24 +24,32 @@ async function loadConfig() {
 // 保存设置
 async function saveSettings() {
     const dataPath = document.getElementById('data-path').value.trim();
-    
+
     if (!dataPath) {
         showToast('请输入数据存储路径', 'warning');
         return;
     }
-    
+
     try {
-        const response = await fetch(`${API_BASE}/api/config`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        let data;
+        if (isElectron) {
+            data = await window.electronAPI.saveConfig({
                 data_path: dataPath,
                 questions_file: 'questions.json'
-            })
-        });
-        
-        const data = await response.json();
-        
+            });
+        } else {
+            const response = await fetch(`${API_BASE}/api/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    data_path: dataPath,
+                    questions_file: 'questions.json'
+                })
+            });
+
+            data = await response.json();
+        }
+
         if (data.success) {
             showToast('设置已保存', 'success');
             loadConfig();
@@ -55,18 +68,29 @@ function clearAllData() {
         '确定要清空所有题库数据吗？该操作不可恢复！',
         async () => {
             try {
-                // 获取所有题库并删除
-                const response = await fetch(`${API_BASE}/api/banks`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    for (const bank of data.banks) {
-                        await fetch(`${API_BASE}/api/banks/${encodeURIComponent(bank.name)}`, {
-                            method: 'DELETE'
-                        });
+                if (isElectron) {
+                    const data = await window.electronAPI.getBanks();
+                    if (data.success) {
+                        for (const bank of data.banks) {
+                            await window.electronAPI.deleteBank(bank.name);
+                        }
+                        showToast('所有数据已清空', 'success');
+                        loadStats();
                     }
-                    showToast('所有数据已清空', 'success');
-                    loadStats();
+                } else {
+                    // 获取所有题库并删除
+                    const response = await fetch(`${API_BASE}/api/banks`);
+                    const data = await response.json();
+
+                    if (data.success) {
+                        for (const bank of data.banks) {
+                            await fetch(`${API_BASE}/api/banks/${encodeURIComponent(bank.name)}`, {
+                                method: 'DELETE'
+                            });
+                        }
+                        showToast('所有数据已清空', 'success');
+                        loadStats();
+                    }
                 }
             } catch (error) {
                 showToast('清空数据失败: ' + error.message, 'error');

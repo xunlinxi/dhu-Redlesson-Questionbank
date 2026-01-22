@@ -46,6 +46,7 @@ npm run install-python
 - 安装所需的 Python 包：
   - `python-docx==1.1.0` - Word 文档解析
   - `lxml==5.1.0` - XML/HTML 解析
+  - `pywin32==306` - Windows COM 接口（仅 Windows，用于 .doc 文件）
 - 验证依赖安装
 
 **依赖**：
@@ -127,6 +128,15 @@ electron/python/bin/python3 -m pip list
 应该看到：
 - `python-docx 1.1.0`
 - `lxml 5.1.0`
+- `pywin32 306`（仅 Windows）
+
+### 检查 .doc 文件支持（仅 Windows）
+
+```bash
+# 检查系统是否安装 Word
+# Windows
+python -c "import win32com.client; word = win32com.client.Dispatch('Word.Application'); print('Word available:', word.Version); word.Quit()"
+```
 
 ### 启动应用测试
 
@@ -161,6 +171,25 @@ npm start
 
 ## ⚠️ 注意事项
 
+### 平台限制
+
+#### .doc 文件支持
+- **Windows**: 完全支持 .doc 文件（通过 pywin32 + Word COM 接口）
+  - 需要系统安装 Microsoft Word
+  - pywin32 库会自动安装（仅 Windows 平台）
+- **macOS/Linux**: 不支持 .doc 文件
+  - 建议将 .doc 文件转换为 .docx 格式后再导入
+  - 可以使用 LibreOffice 或在线转换工具进行转换
+
+#### 跨平台差异
+
+| 功能 | Windows | macOS | Linux |
+|------|---------|--------|-------|
+| .docx 文件 | ✅ 完全支持 | ✅ 完全支持 | ✅ 完全支持 |
+| .txt 文件 | ✅ 完全支持 | ✅ 完全支持 | ✅ 完全支持 |
+| .doc 文件 | ✅ 完全支持 | ❌ 不支持 | ❌ 不支持 |
+| 所需库 | python-docx, lxml, pywin32 | python-docx, lxml | python-docx, lxml |
+
 ### 网络要求
 
 - 需要 Python 官网访问权限
@@ -183,7 +212,8 @@ export HTTPS_PROXY=http://proxy:port
 ### 磁盘空间
 
 - Python Embedded: ~30MB
-- 依赖库: ~10MB
+- 依赖库（基础）: ~10MB
+- pywin32（仅 Windows）: ~5-10MB
 - 临时文件: ~50MB（安装后自动删除）
 
 ### 下载速度

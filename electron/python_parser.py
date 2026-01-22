@@ -10,10 +10,11 @@ import json
 import os
 
 # 添加 backend 目录到路径
-backend_dir = os.path.join(os.path.dirname(__file__), '..', 'backend')
+backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
 sys.path.insert(0, backend_dir)
 
 from parser import parse_file
+
 
 def parse_document(file_path):
     """
@@ -24,19 +25,17 @@ def parse_document(file_path):
         result = parse_file(file_path, None)
         questions = result[0]
         bank_name = result[1]
-        semester = result[2] if len(result) > 2 else ''
+        semester = result[2] if len(result) > 2 else ""
 
         return {
-            'success': True,
-            'questions': questions,
-            'bank_name': bank_name,
-            'semester': semester
+            "success": True,
+            "questions": questions,
+            "bank_name": bank_name,
+            "semester": semester,
         }
     except Exception as e:
-        return {
-            'success': False,
-            'error': str(e)
-        }
+        return {"success": False, "error": str(e)}
+
 
 def main():
     """
@@ -51,14 +50,15 @@ def main():
     try:
         data = json.loads(input_data)
 
-        if data.get('action') == 'parse':
-            file_path = data.get('file_path')
+        if data.get("action") == "parse":
+            file_path = data.get("file_path")
             result = parse_document(file_path)
-            print(json.dumps(result, ensure_ascii=False))
+            print(json.dumps(result, ensure_ascii=False), flush=True)
         else:
-            print(json.dumps({'success': False, 'error': 'Unknown action'}))
+            print(json.dumps({"success": False, "error": "Unknown action"}), flush=True)
     except Exception as e:
-        print(json.dumps({'success': False, 'error': str(e)}))
+        print(json.dumps({"success": False, "error": str(e)}), flush=True)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

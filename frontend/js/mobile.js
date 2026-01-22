@@ -41,6 +41,12 @@ function initMobile() {
 
 // 检测是否为本地客户端
 function checkClientType() {
+    // Electron 环境始终是本地客户端
+    if (window.electronAPI !== undefined) {
+        isLocalClient = true;
+        return;
+    }
+
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/api/client/info', true);
     xhr.onreadystatechange = function() {

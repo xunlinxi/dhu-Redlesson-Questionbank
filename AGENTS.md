@@ -345,6 +345,9 @@ D. 选项D
 - **IPC 通信**: 前端通过 IPC 与主进程通信，不再依赖 HTTP API
 - **数据存储**: 数据存储在用户目录下的 `Application Support` 文件夹
 - **Python 集成**: Word 文档解析使用内嵌 Python 运行时
+  - 依赖库: `python-docx==1.1.0`, `lxml==5.1.0`, `pywin32==306`（仅 Windows）
+  - Windows 平台支持 .doc 和 .docx 文件
+  - macOS/Linux 平台仅支持 .docx 文件
 
 #### 改造状态
 - [ ] 阶段一：Electron 基础架构搭建（待实施）

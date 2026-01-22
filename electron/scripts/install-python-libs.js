@@ -26,11 +26,16 @@ const SITE_PACKAGES = process.platform === 'win32'
 // get-pip.py URL
 const GET_PIP_URL = 'https://bootstrap.pypa.io/get-pip.py';
 
-// 需要安装的依赖库
+// 需要安装的依赖库（基础包）
 const REQUIRED_PACKAGES = [
     'python-docx==1.1.0',
     'lxml==5.1.0'
 ];
+
+// Windows 平台额外安装 pywin32（用于 .doc 文件支持）
+if (process.platform === 'win32') {
+    REQUIRED_PACKAGES.push('pywin32==306');
+}
 
 // ==================== 工具函数 ====================
 
@@ -220,8 +225,16 @@ async function installPackages() {
 async function verifyInstallations() {
     console.log('\n🔍 验证依赖安装...');
 
-    const testScript = `
+    // 基础验证脚本
+    let testScript = `
 import sys
+import io
+
+# 设置标准输出为 UTF-8 编码（Windows 控制台兼容）
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 sys.path.insert(0, r'${SITE_PACKAGES.replace(/\\/g, '\\\\')}')
 
 try:
@@ -236,6 +249,18 @@ try:
 except ImportError as e:
     print('❌ lxml: FAIL -', e)
 `;
+
+    // Windows 平台额外检查 pywin32
+    if (process.platform === 'win32') {
+        testScript += `
+try:
+    import win32com.client
+    import pythoncom
+    print('✅ pywin32: OK')
+except ImportError as e:
+    print('❌ pywin32: FAIL -', e)
+`;
+    }
 
     try {
         const testPath = path.join(PYTHON_DIR, 'test_imports.py');

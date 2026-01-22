@@ -36,14 +36,18 @@ const NAV_PAGE_SIZE = 56; // 答题卡每页显示数量
 document.addEventListener('DOMContentLoaded', async function() {
     initNavigation();
     initUpload();
+
+    // Electron 环境特殊处理
+    if (isElectron) {
+        serverOnline = true;
+        await loadStats();
+    }
+
     await loadConfig();
 
     // Electron 环境不需要健康检查
     if (!isElectron) {
         startHealthCheck();
-    } else {
-        serverOnline = true;
-        await loadStats();
     }
 
     // 设置初始页面属性
@@ -200,9 +204,14 @@ function switchPage(page) {
 // ==================== 统计数据 ====================
 async function loadStats() {
     try {
-        const response = await fetch(`${API_BASE}/api/stats`);
-        const data = await response.json();
-        
+        let data;
+        if (isElectron) {
+            data = await window.electronAPI.getStats();
+        } else {
+            const response = await fetch(`${API_BASE}/api/stats`);
+            data = await response.json();
+        }
+
         if (data.success) {
             const stats = data.stats;
             document.getElementById('total-banks').textContent = stats.total_banks;
@@ -263,32 +272,107 @@ async function loadBankChapters() {
 function initUpload() {
     const uploadArea = document.getElementById('upload-area');
     const fileInput = document.getElementById('file-input');
-    
-    uploadArea.addEventListener('click', () => fileInput.click());
-    
-    uploadArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadArea.classList.add('dragover');
-    });
-    
-    uploadArea.addEventListener('dragleave', () => {
-        uploadArea.classList.remove('dragover');
-    });
-    
-    uploadArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        uploadArea.classList.remove('dragover');
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            handleFileSelect(files[0]);
-        }
-    });
-    
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            handleFileSelect(e.target.files[0]);
-        }
-    });
+
+    if (isElectron) {
+        // Electron 环境：点击上传区域时打开文件对话框
+        uploadArea.addEventListener('click', async () => {
+            console.log('🖱️ 点击上传区域');
+            try {
+                const result = await window.electronAPI.showOpenDialog({
+                    title: '选择题库文件',
+                    filters: [
+                        { name: '题库文件', extensions: ['txt', 'doc', 'docx'] },
+                        { name: '所有文件', extensions: ['*'] }
+                    ],
+                    properties: ['openFile']
+                });
+
+                console.log('📄 showOpenDialog 返回:', result);
+
+                if (result.canceled || result.filePaths.length === 0) {
+                    console.log('❌ 用户取消了文件选择');
+                    return; // 用户取消了选择
+                }
+
+                const filePath = result.filePaths[0];
+                const fileName = filePath.split(/[/\\]/).pop();
+                console.log('✅ 选择了文件 - filePath:', filePath, 'fileName:', fileName);
+                handleFileSelectElectron(filePath, fileName);
+            } catch (error) {
+                console.error('❌ 文件选择失败:', error);
+                showToast('文件选择失败', 'error');
+            }
+        });
+
+        // Electron 环境：添加拖拽支持（注意：拖拽无法获取文件路径，需要点击上传）
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            console.log('📦 检测到拖拽');
+
+            // Electron 中拖拽无法获取文件路径，需要点击上传
+            console.log('⚠️ Electron 安全限制：拖拽无法获取文件路径');
+            showToast('由于安全限制，请点击上传区域选择文件', 'warning');
+        });
+    } else {
+        // Web 环境：使用原生文件上传
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+    }
+}
+
+function handleFileSelectElectron(filePath, fileName) {
+    console.log('📥 handleFileSelectElectron 被调用 - filePath:', filePath, 'fileName:', fileName);
+
+    const allowedTypes = ['.txt', '.doc', '.docx'];
+    const ext = '.' + fileName.split('.').pop().toLowerCase();
+
+    if (!allowedTypes.includes(ext)) {
+        console.error('❌ 文件类型不支持:', ext);
+        showToast('请选择 .txt、.doc 或 .docx 格式的文件', 'error');
+        return;
+    }
+
+    document.getElementById('file-name').textContent = fileName;
+    document.getElementById('selected-file').style.display = 'flex';
+    document.getElementById('import-btn').disabled = false;
+
+    // 保存文件路径供导入使用
+    const fileInput = document.getElementById('file-input');
+    fileInput.dataset.filePath = filePath;
+    console.log('💾 已设置 dataset.filePath:', fileInput.dataset.filePath);
 }
 
 function handleFileSelect(file) {
@@ -316,43 +400,71 @@ function createFileList(file) {
 
 function clearFile() {
     document.getElementById('file-input').value = '';
+    delete document.getElementById('file-input').dataset.filePath;
     document.getElementById('selected-file').style.display = 'none';
     document.getElementById('import-btn').disabled = true;
     document.getElementById('import-result').style.display = 'none';
 }
 
 async function importFile() {
-    const fileInput = document.getElementById('file-input');
     const bankName = document.getElementById('bank-name').value.trim();
-    
-    if (!fileInput.files.length) {
-        showToast('请先选择文件', 'error');
-        return;
-    }
-    
-    const formData = new FormData();
-    formData.append('file', fileInput.files[0]);
-    if (bankName) {
-        formData.append('bank_name', bankName);
-    }
-    
+
+    console.log('📥 前端开始导入 - bankName:', bankName, 'isElectron:', isElectron);
+
     // 显示进度
     document.getElementById('import-progress').style.display = 'block';
     document.getElementById('import-result').style.display = 'none';
     document.getElementById('import-btn').disabled = true;
-    
+
     try {
-        const response = await fetch(`${API_BASE}/api/import`, {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await response.json();
-        
+        let data;
+
+        if (isElectron) {
+            // Electron 环境：从 dataset 获取文件路径
+            const fileInput = document.getElementById('file-input');
+            const filePath = fileInput.dataset.filePath;
+
+            console.log('📄 Electron 环境 - fileInput:', fileInput);
+            console.log('📄 dataset.filePath:', filePath);
+
+            if (!filePath) {
+                document.getElementById('import-progress').style.display = 'none';
+                document.getElementById('import-btn').disabled = false;
+                showToast('请先选择文件', 'error');
+                return; // 用户还没有选择文件
+            }
+
+            console.log('📤 调用 electronAPI.importQuestions - filePath:', filePath, 'bankName:', bankName);
+            data = await window.electronAPI.importQuestions(filePath, bankName);
+        } else {
+            // Web 环境：使用文件上传
+            const fileInput = document.getElementById('file-input');
+
+            if (!fileInput.files.length) {
+                showToast('请先选择文件', 'error');
+                document.getElementById('import-progress').style.display = 'none';
+                document.getElementById('import-btn').disabled = false;
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            if (bankName) {
+                formData.append('bank_name', bankName);
+            }
+
+            const response = await fetch(`${API_BASE}/api/import`, {
+                method: 'POST',
+                body: formData
+            });
+
+            data = await response.json();
+        }
+
         document.getElementById('import-progress').style.display = 'none';
         const resultDiv = document.getElementById('import-result');
         resultDiv.style.display = 'block';
-        
+
         if (data.success) {
             resultDiv.className = 'import-result success';
             resultDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message}`;
@@ -369,7 +481,7 @@ async function importFile() {
         document.getElementById('import-progress').style.display = 'none';
         showToast('导入失败: ' + error.message, 'error');
     }
-    
+
     document.getElementById('import-btn').disabled = false;
 }
 
@@ -1590,12 +1702,17 @@ function showResultQuestion(index) {
 // ==================== 设置 ====================
 async function loadConfig() {
     try {
-        const response = await fetch(`${API_BASE}/api/config`);
-        const data = await response.json();
-        
+        let data;
+        if (isElectron) {
+            data = await window.electronAPI.getConfig();
+        } else {
+            const response = await fetch(`${API_BASE}/api/config`);
+            data = await response.json();
+        }
+
         if (data.success) {
             document.getElementById('data-path').value = data.config.data_path || '';
-            document.getElementById('current-data-file').textContent = 
+            document.getElementById('current-data-file').textContent =
                 data.config.data_path + '/' + data.config.questions_file;
         }
     } catch (error) {

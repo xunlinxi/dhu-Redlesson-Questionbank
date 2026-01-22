@@ -142,11 +142,26 @@ function confirmClearWrongBank(bankName) {
         `确定要清空"${bankName}"的所有错题吗？`,
         async () => {
             try {
-                const response = await fetch(`${API_BASE}/api/wrongbook/bank/${encodeURIComponent(bankName)}`, {
-                    method: 'DELETE'
-                });
-                const data = await response.json();
-                
+                let data;
+                if (isElectron) {
+                    // Electron: 先获取所有错题，然后逐个删除
+                    const wrongbookData = await window.electronAPI.getWrongbook(bankName);
+                    if (wrongbookData.success) {
+                        for (const q of wrongbookData.wrong_questions) {
+                            await window.electronAPI.removeWrongQuestion(q.id);
+                        }
+                        data = { success: true, message: `已清空"${bankName}"的所有错题` };
+                    } else {
+                        data = { success: false, error: '获取错题失败' };
+                    }
+                } else {
+                    // Web 环境
+                    const response = await fetch(`${API_BASE}/api/wrongbook/bank/${encodeURIComponent(bankName)}`, {
+                        method: 'DELETE'
+                    });
+                    data = await response.json();
+                }
+
                 if (data.success) {
                     showToast(data.message, 'success');
                     loadWrongBanks();
