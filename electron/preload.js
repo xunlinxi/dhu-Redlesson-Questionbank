@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // 统计
     getStats: (filters) => ipcRenderer.invoke('get-stats', filters),
+    getStatsByBank: () => ipcRenderer.invoke('get-stats-by-bank'),
 
     // 配置
     getConfig: () => ipcRenderer.invoke('get-config'),

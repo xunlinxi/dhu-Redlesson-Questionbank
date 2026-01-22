@@ -374,10 +374,50 @@ ipcMain.handle('get-wrongbook', async (event, filters = {}) => {
     }
 });
 
+// 错题本统计
 ipcMain.handle('get-wrongbook-stats', async () => {
     try {
-        const stats = WrongbookModel.getStats();
-        return { success: true, stats, total: stats.total };
+        const wrongQuestions = WrongbookModel.getWrongQuestions();
+        const stats = {};
+
+        wrongQuestions.forEach(q => {
+            if (!stats[q.bank]) {
+                stats[q.bank] = { total: 0, single: 0, multi: 0 };
+            }
+            stats[q.bank].total++;
+            if (q.type === 'single') stats[q.bank].single++;
+            if (q.type === 'multi') stats[q.bank].multi++;
+        });
+
+        // 计算总数
+        const total = wrongQuestions.length;
+        
+        return { success: true, stats, total };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// 按题库统计（用于首页展示章节概览）
+ipcMain.handle('get-stats-by-bank', async () => {
+    try {
+        const questions = QuestionsModel.getQuestions({});
+        const stats = {};
+
+        questions.forEach(q => {
+            if (!stats[q.bank]) {
+                stats[q.bank] = { total: 0, chapters: {} };
+            }
+            stats[q.bank].total++;
+            
+            const chapter = q.chapter || '默认章节';
+            if (!stats[q.bank].chapters[chapter]) {
+                stats[q.bank].chapters[chapter] = 0;
+            }
+            stats[q.bank].chapters[chapter]++;
+        });
+
+        return { success: true, stats };
     } catch (error) {
         return { success: false, error: error.message };
     }
@@ -480,24 +520,28 @@ ipcMain.handle('delete-progress', async (event, id) => {
     }
 });
 
-// 统计
+// 统计（首页总览）
 ipcMain.handle('get-stats', async (event, filters = {}) => {
     try {
-        const questions = QuestionsModel.getQuestions(filters);
+        const data = QuestionsModel.load();
+        const questions = data.questions || [];
+        const banks = data.banks || {};
 
-        const total = questions.length;
-        const singleCount = questions.filter(q => q.type === 'single').length;
-        const multiCount = questions.filter(q => q.type === 'multi').length;
+        const total_questions = questions.length;
+        const total_banks = Object.keys(banks).length;
+        const single_choice_count = questions.filter(q => q.type === 'single').length;
+        const multi_choice_count = questions.filter(q => q.type === 'multi').length;
 
-        const wrongQuestions = WrongbookModel.getWrongQuestions(filters);
-        const wrongCount = wrongQuestions.length;
-
+        // 构造与 Python 后端一致的返回格式
         const stats = {
-            total,
-            single_count: singleCount,
-            multi_count: multiCount,
-            wrong_count: wrongCount,
-            correct_rate: total > 0 ? ((total - wrongCount) / total * 100).toFixed(2) : 0
+            total_questions,
+            total_banks,
+            single_choice_count,
+            multi_choice_count,
+            // 兼容旧字段
+            total: total_questions,
+            single_count: single_choice_count, 
+            multi_count: multi_choice_count
         };
 
         return { success: true, stats };
