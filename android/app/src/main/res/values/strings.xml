@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RedLesson</string>
+    <string name="title_activity_main">RedLesson</string>
+    <string name="package_name">com.dhu.redlesson</string>
+    <string name="custom_url_scheme">com.dhu.redlesson</string>
+</resources>

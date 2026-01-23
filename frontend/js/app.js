@@ -204,13 +204,8 @@ function switchPage(page) {
 // ==================== 统计数据 ====================
 async function loadStats() {
     try {
-        let data;
-        if (isElectron) {
-            data = await window.electronAPI.getStats();
-        } else {
-            const response = await fetch(`${API_BASE}/api/stats`);
-            data = await response.json();
-        }
+        // 使用 StorageService 统一调用
+        const data = await window.storageService.getStats();
 
         if (data.success) {
             const stats = data.stats;
@@ -227,13 +222,8 @@ async function loadStats() {
 // 加载按题库分组的章节分布
 async function loadBankChapters() {
     try {
-        let data;
-        if (isElectron) {
-            data = await window.electronAPI.getStatsByBank();
-        } else {
-            const response = await fetch(`${API_BASE}/api/stats/by_bank`);
-            data = await response.json();
-        }
+        // 使用 StorageService 统一调用
+        const data = await window.storageService.getStatsByBank();
         
         const container = document.getElementById('bank-chapters-container');
         if (!container) return;
@@ -441,6 +431,34 @@ async function importFile() {
 
             console.log('📤 调用 electronAPI.importQuestions - filePath:', filePath, 'bankName:', bankName);
             data = await window.electronAPI.importQuestions(filePath, bankName);
+        } else if (window.storageService && window.storageService.isMobile) {
+            // Mobile 环境：本地解析
+            const fileInput = document.getElementById('file-input');
+            if (!fileInput.files.length) {
+                showToast('请先选择文件', 'error');
+                document.getElementById('import-progress').style.display = 'none';
+                document.getElementById('import-btn').disabled = false;
+                return;
+            }
+
+            try {
+                const file = fileInput.files[0];
+                const effectiveBankName = bankName || file.name.replace(/\.[^/.]+$/, "");
+                const questions = await window.questionParser.parseFile(file);
+
+                if (!questions || questions.length === 0) throw new Error("未能解析出任何题目");
+
+                const result = await window.storageService.importQuestions(effectiveBankName, questions);
+                if (result.success) {
+                    data = { success: true, message: `成功导入 ${result.count} 道题目` };
+                } else {
+                    data = { success: false, error: result.error };
+                }
+            } catch (e) {
+                console.error("Import error:", e);
+                data = { success: false, error: e.message };
+            }
+
         } else {
             // Web 环境：使用文件上传
             const fileInput = document.getElementById('file-input');
@@ -493,14 +511,7 @@ async function importFile() {
 // ==================== 题库管理 ====================
 async function loadBanks() {
     try {
-        let data;
-        
-        if (isElectron) {
-            data = await window.electronAPI.getBanks();
-        } else {
-            const response = await fetch(`${API_BASE}/api/banks`);
-            data = await response.json();
-        }
+        const data = await window.storageService.getBanks();
         
         const bankList = document.getElementById('bank-list');
         
@@ -572,13 +583,7 @@ async function browseBank(bankName) {
 
 async function loadChapters(bankName) {
     try {
-        let data;
-        if (isElectron) {
-            data = await window.electronAPI.getChapters(bankName);
-        } else {
-            const response = await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bankName)}`);
-            data = await response.json();
-        }
+        const data = await window.storageService.getChapters(bankName);
         
         const select = document.getElementById('filter-chapter');
         select.innerHTML = '<option value="">全部章节</option>';
@@ -601,18 +606,10 @@ async function loadQuestions() {
     
     try {
         let data;
-        if (isElectron) {
-            const filters = { bank: currentBankName };
-            if (type) filters.type = type;
-            if (chapter) filters.chapter = chapter;
-            data = await window.electronAPI.getQuestions(filters);
-        } else {
-            let url = `${API_BASE}/api/questions?bank=${encodeURIComponent(currentBankName)}`;
-            if (type) url += `&type=${type}`;
-            if (chapter) url += `&chapter=${encodeURIComponent(chapter)}`;
-            const response = await fetch(url);
-            data = await response.json();
-        }
+        const filters = { bank: currentBankName };
+        if (type) filters.type = type;
+        if (chapter) filters.chapter = chapter;
+        data = await window.storageService.getQuestions(filters);
         
         const questionList = document.getElementById('question-list');
         
@@ -680,22 +677,7 @@ function confirmDeleteBank(bankName) {
         `确定要删除题库"${bankName}"吗？该操作不可恢复。`,
         async () => {
             try {
-                let data;
-                if (isElectron) {
-                    const success = await window.electronAPI.deleteBank(bankName);
-                    // deleteBank in electron returns boolean usually based on models/index.js
-                    // Let's check preload.js `deleteBank: (bankName) => ipcRenderer.invoke('delete-bank', bankName)`
-                    // And main.js `ipcMain.handle('delete-bank', ...)`
-                    // main.js line 286: return { success: result, message: result ? '删除成功' : '删除失败' };
-                    // models.js deleteBank returns actual data object or false? No, wait. 
-                    // Let's assume it returns {success: true/false}
-                    data = success; // Wait, main.js usually returns object for handlers.
-                } else {
-                    const response = await fetch(`${API_BASE}/api/banks/${encodeURIComponent(bankName)}`, {
-                        method: 'DELETE'
-                    });
-                    data = await response.json();
-                }
+                const data = await window.storageService.deleteBank(bankName);
                 
                 if (data.success) {
                     showToast(data.message || '删除成功', 'success');
@@ -849,13 +831,7 @@ function removeEditOption(key) {
 // ==================== 刷题功能 ====================
 async function loadPracticeOptions() {
     try {
-        let data;
-        if (isElectron) {
-            data = await window.electronAPI.getBanks();
-        } else {
-            const response = await fetch(`${API_BASE}/api/banks`);
-            data = await response.json();
-        }
+        const data = await window.storageService.getBanks();
         
         const select = document.getElementById('practice-bank');
         select.innerHTML = '<option value="">全部题库</option>';
@@ -888,13 +864,7 @@ async function loadPracticeChapters() {
     
     if (bank) {
         try {
-            let data;
-            if (isElectron) {
-                data = await window.electronAPI.getChapters(bank);
-            } else {
-                const response = await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bank)}`);
-                data = await response.json();
-            }
+            const data = await window.storageService.getChapters(bank);
             
             if (data.success) {
                 data.chapters.forEach(chapter => {
@@ -913,33 +883,15 @@ async function updateAvailableStats() {
     const bank = document.getElementById('practice-bank').value;
     const chapter = document.getElementById('practice-chapter')?.value || '';
     
-    let url = `${API_BASE}/api/stats`;
-    if (bank) {
-        url += `?bank=${encodeURIComponent(bank)}`;
-        if (chapter) {
-            url += `&chapter=${encodeURIComponent(chapter)}`;
-        }
-    }
-    
     try {
         // 获取题目统计
         let singleCount = 0;
         let multiCount = 0;
         
-        let data;
-        if (isElectron) {
-            data = await window.electronAPI.getQuestions({
-                bank: bank,
-                chapter: chapter
-            });
-        } else {
-            let questionsUrl = `${API_BASE}/api/questions?`;
-            if (bank) questionsUrl += `bank=${encodeURIComponent(bank)}&`;
-            if (chapter) questionsUrl += `chapter=${encodeURIComponent(chapter)}&`;
-            
-            const response = await fetch(questionsUrl);
-            data = await response.json();
-        }
+        const data = await window.storageService.getQuestions({
+            bank: bank,
+            chapter: chapter
+        });
         
         if (data.success && Array.isArray(data.questions)) {
             data.questions.forEach(q => {
@@ -996,20 +948,10 @@ async function startPractice(examMode = false) {
     currentPracticeMode = examMode ? 'exam' : 'random';
     
     try {
-        let data;
-        if (isElectron) {
-            const filters = { single_count: singleCount, multi_count: multiCount };
-            if (bank) filters.bank = bank;
-            if (chapter) filters.chapter = chapter;
-            const responseData = await window.electronAPI.practiceRandom(filters);
-            data = responseData;
-        } else {
-            let url = `${API_BASE}/api/practice/random?single_count=${singleCount}&multi_count=${multiCount}`;
-            if (bank) url += `&bank=${encodeURIComponent(bank)}`;
-            if (chapter) url += `&chapter=${encodeURIComponent(chapter)}`;
-            const response = await fetch(url);
-            data = await response.json();
-        }
+        const filters = { single_count: singleCount, multi_count: multiCount };
+        if (bank) filters.bank = bank;
+        if (chapter) filters.chapter = chapter;
+        const data = await window.storageService.getPracticeRandom(filters);
         
         if (data.success && data.questions.length > 0) {
             practiceQuestions = data.questions.map(q => {
@@ -1771,18 +1713,12 @@ function showResultQuestion(index) {
 // ==================== 设置 ====================
 async function loadConfig() {
     try {
-        let data;
-        if (isElectron) {
-            data = await window.electronAPI.getConfig();
-        } else {
-            const response = await fetch(`${API_BASE}/api/config`);
-            data = await response.json();
-        }
+        const data = await window.storageService.getConfig();
 
         if (data.success) {
             document.getElementById('data-path').value = data.config.data_path || '';
             document.getElementById('current-data-file').textContent =
-                data.config.data_path + '/' + data.config.questions_file;
+                (data.config.data_path || '') + '/' + (data.config.questions_file || '');
         }
     } catch (error) {
         console.error('加载配置失败:', error);
@@ -1798,24 +1734,12 @@ async function saveSettings() {
     }
     
     try {
-        let data;
         const configData = {
             data_path: dataPath,
             questions_file: 'questions.json'
         };
 
-        if (isElectron) {
-            const success = await window.electronAPI.saveConfig(configData);
-            data = { success };
-            if (!success) data.error = '保存失败';
-        } else {
-            const response = await fetch(`${API_BASE}/api/config`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(configData)
-            });
-            data = await response.json();
-        }
+        const data = await window.storageService.saveConfig(configData);
         
         if (data.success) {
             showToast('设置已保存', 'success');
@@ -1901,13 +1825,7 @@ function browseDataPath() {
 // ==================== 排名系统 ====================
 async function loadRankings() {
     try {
-        let data;
-        if (isElectron) {
-            data = await window.electronAPI.getRankings();
-        } else {
-            const response = await fetch(`${API_BASE}/api/rankings`);
-            data = await response.json();
-        }
+        const data = await window.storageService.getRankings();
         
         if (data && data.success) {
             renderRankings(data.rankings);
@@ -1959,13 +1877,7 @@ function renderRankings(rankings) {
 
 async function saveRanking(record) {
     try {
-        const response = await fetch(`${API_BASE}/api/rankings`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(record)
-        });
-        
-        const data = await response.json();
+        const data = await window.storageService.saveRanking(record);
         
         if (data.success) {
             loadRankings();
@@ -1981,17 +1893,13 @@ async function clearRankings() {
         '确定要清空所有排名记录吗？此操作不可恢复。',
         async () => {
             try {
-                const response = await fetch(`${API_BASE}/api/rankings`, {
-                    method: 'DELETE'
-                });
-                
-                const data = await response.json();
+                const data = await window.storageService.clearRankings();
                 
                 if (data.success) {
                     showToast('排名已清空', 'success');
                     loadRankings();
                 } else {
-                    showToast('清空失败: ' + data.message, 'error');
+                    showToast('清空失败: ' + (data.error || data.message), 'error');
                 }
             } catch (error) {
                 showToast('清空失败: ' + error.message, 'error');
@@ -2108,20 +2016,11 @@ async function startSequencePractice() {
     }
     
     try {
-        let data;
-        if (isElectron) {
-            const filters = { bank };
-            if (chapter) filters.chapter = chapter;
-            if (shuffleQuestions) filters.shuffle = true;
-            const responseData = await window.electronAPI.practiceSequence(filters);
-            data = responseData;
-        } else {
-            let url = `${API_BASE}/api/practice/sequence?bank=${encodeURIComponent(bank)}`;
-            if (chapter) url += `&chapter=${encodeURIComponent(chapter)}`;
-            if (shuffleQuestions) url += `&shuffle=true`;
-            const response = await fetch(url);
-            data = await response.json();
-        }
+        const filters = { bank };
+        if (chapter) filters.chapter = chapter;
+        if (shuffleQuestions) filters.shuffle = true;
+        
+        const data = await window.storageService.getPracticeSequence(filters);
         
         if (data.success && data.questions.length > 0) {
             practiceQuestions = data.questions.map(q => {
@@ -2169,18 +2068,10 @@ async function startWrongPractice() {
     }
     
     try {
-        let data;
-        if (isElectron) {
-            const filters = { single_count: singleCount, multi_count: multiCount };
-            const responseData = await window.electronAPI.practiceWrong(filters);
-            data = responseData
-            data = await window.electronAPI.practiceWrong(filters);
-        } else {
-            let url = `${API_BASE}/api/practice/wrong?single_count=${singleCount}&multi_count=${multiCount}`;
-            if (bank) url += `&bank=${encodeURIComponent(bank)}`;
-            const response = await fetch(url);
-            data = await response.json();
-        }
+        const filters = { single_count: singleCount, multi_count: multiCount };
+        if (bank) filters.bank = bank;
+        
+        const data = await window.storageService.getPracticeWrong(filters);
         
         if (data.success && data.questions.length > 0) {
             practiceQuestions = data.questions.map(q => {
@@ -2286,13 +2177,7 @@ function initPracticeSession(enableTimer, timeMinutes, examMode) {
 // ==================== 错题本功能 ====================
 async function loadWrongBanks() {
     try {
-        let data;
-        if (isElectron) {
-            data = await window.electronAPI.getWrongbookStats();
-        } else {
-            const response = await fetch(`${API_BASE}/api/wrongbook/stats`);
-            data = await response.json();
-        }
+        const data = await window.storageService.getWrongbookStats();
         
         const bankList = document.getElementById('wrong-bank-list');
         
@@ -2351,18 +2236,13 @@ async function browseWrongBank(bankName) {
 
 async function loadWrongQuestions(bankName) {
     try {
-        let data;
-        if (isElectron) {
-            data = await window.electronAPI.getWrongbook({ bank: bankName });
-        } else {
-            const response = await fetch(`${API_BASE}/api/wrongbook?bank=${encodeURIComponent(bankName)}`);
-            data = await response.json();
-        }
+        const data = await window.storageService.getWrongBook(bankName);
         
         const questionList = document.getElementById('wrong-question-list');
         
-        if (data.success && data.wrong_questions.length > 0) {
-            questionList.innerHTML = data.wrong_questions.map((q, index) => `
+        const list = data.wrong_questions || data.questions;
+        if (data.success && list && list.length > 0) {
+            questionList.innerHTML = list.map((q, index) => `
                 <div class="question-item ${q.type === 'multi' ? 'multi' : ''}">
                     <div class="question-header">
                         <span class="question-type ${q.type === 'multi' ? 'multi' : ''}">
@@ -2407,15 +2287,7 @@ async function loadWrongQuestions(bankName) {
 
 async function removeFromWrongbook(questionId) {
     try {
-        let data;
-        if (isElectron) {
-            data = await window.electronAPI.removeWrongQuestion(questionId);
-        } else {
-            const response = await fetch(`${API_BASE}/api/wrongbook/${questionId}`, {
-                method: 'DELETE'
-            });
-            data = await response.json();
-        }
+        const data = await window.storageService.removeWrongQuestion(questionId);
         
         if (data.success) {
             showToast('已从错题本移除', 'success');
@@ -2490,22 +2362,13 @@ async function addToWrongbook(question, userAnswer) {
             originalUserAnswer = userAnswer.map(ans => question.reverseAnswerMap[ans] || ans);
         }
         
-        if (isElectron) {
-            await window.electronAPI.addWrongQuestion({
-                questionId: question.id,
-                user_answer: originalUserAnswer
-            });
-        } else {
-            await fetch(`${API_BASE}/api/wrongbook`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    question_id: question.id,
-                    user_answer: originalUserAnswer,
-                    question: question  // 传递完整题目对象，供远程用户本地存储使用
-                })
-            });
-        }
+        await window.storageService.addWrongQuestion({
+            questionId: question.id,
+            question_id: question.id,
+            bank: question.bank,
+            user_answer: originalUserAnswer,
+            question: question
+        });
     } catch (error) {
         console.error('添加错题失败:', error);
     }
@@ -2514,13 +2377,7 @@ async function addToWrongbook(question, userAnswer) {
 // ==================== 进度保存功能 ====================
 async function loadProgressList() {
     try {
-        let data;
-        if (isElectron) {
-            data = await window.electronAPI.getProgress();
-        } else {
-            const response = await fetch(`${API_BASE}/api/progress`);
-            data = await response.json();
-        }
+        const data = await window.storageService.getProgressList();
         
         const container = document.getElementById('progress-list');
         if (!container) return;
@@ -2595,19 +2452,7 @@ async function saveCurrentProgress() {
     };
     
     try {
-        let data;
-        if (isElectron) {
-            const success = await window.electronAPI.saveProgress(progressData);
-            // In main.js save-progress returns { success: true, id: newId, message: ... }
-            data = success; 
-        } else {
-            const response = await fetch(`${API_BASE}/api/progress`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(progressData)
-            });
-            data = await response.json();
-        }
+        const data = await window.storageService.saveProgress(progressData);
         
         if (data.success) {
             // 更新当前进度ID
@@ -2629,8 +2474,7 @@ async function saveCurrentProgress() {
 
 async function loadProgress(progressId) {
     try {
-        const response = await fetch(`${API_BASE}/api/progress/${progressId}`);
-        const data = await response.json();
+        const data = await window.storageService.getProgressById(progressId);
         
         if (data.success && data.progress) {
             const progress = data.progress;
@@ -2642,8 +2486,7 @@ async function loadProgress(progressId) {
                 return;
             }
             
-            const questionsResponse = await fetch(`${API_BASE}/api/questions`);
-            const questionsData = await questionsResponse.json();
+            const questionsData = await window.storageService.getQuestions();
             
             if (!questionsData.success || !questionsData.questions) {
                 showToast('加载题目失败', 'error');
@@ -2765,16 +2608,7 @@ async function loadProgress(progressId) {
 
 async function deleteProgress(progressId, silent = false) {
     try {
-        let data;
-        if (isElectron) {
-            const success = await window.electronAPI.deleteProgress(progressId);
-            data = success; // Assuming deleteProgress returns { success: true }
-        } else {
-            const response = await fetch(`${API_BASE}/api/progress/${progressId}`, {
-                method: 'DELETE'
-            });
-            data = await response.json();
-        }
+        const data = await window.storageService.deleteProgress(progressId);
         
         if (data.success) {
             if (!silent) {

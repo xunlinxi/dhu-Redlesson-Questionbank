@@ -110,8 +110,8 @@ function clearFile() {
 async function importFile() {
     const bankName = document.getElementById('bank-name').value.trim();
 
+    // 1. Electron 环境 (调用内嵌 Python 解析)
     if (isElectron) {
-        // Electron 环境导入
         const filePath = document.getElementById('file-input').dataset.filePath;
 
         if (!filePath) {
@@ -125,30 +125,61 @@ async function importFile() {
 
         try {
             const data = await window.electronAPI.importQuestions(filePath, bankName);
-
-            document.getElementById('import-progress').style.display = 'none';
-            const resultDiv = document.getElementById('import-result');
-            resultDiv.style.display = 'block';
-
-            if (data.success) {
-                resultDiv.className = 'import-result success';
-                resultDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message}`;
-                showToast(data.message, 'success');
-                clearFile();
-                document.getElementById('bank-name').value = '';
-                loadStats();
-            } else {
-                resultDiv.className = 'import-result error';
-                resultDiv.innerHTML = `<i class="fas fa-times-circle"></i> ${data.error}`;
-                showToast(data.error, 'error');
-            }
+            handleImportSuccess(data);
         } catch (error) {
-            document.getElementById('import-progress').style.display = 'none';
-            showToast('导入失败: ' + error.message, 'error');
+            handleImportError(error);
         }
 
         document.getElementById('import-btn').disabled = false;
-    } else {
+    } 
+    // 2. 移动端/离线环境 (前端 JS 解析 + IndexedDB 存储)
+    else if (window.storageService && window.storageService.isMobile) {
+        const fileInput = document.getElementById('file-input');
+        
+        if (!fileInput.files.length) {
+            showToast('请先选择文件', 'error');
+            return;
+        }
+
+        if (!bankName) {
+            showToast('请输入题库名称', 'error');
+            return;
+        }
+
+        document.getElementById('import-progress').style.display = 'block';
+        document.getElementById('import-result').style.display = 'none';
+        document.getElementById('import-btn').disabled = true;
+
+        try {
+            const file = fileInput.files[0];
+            
+            // A. 前端解析
+            const questions = await window.questionParser.parseFile(file);
+            
+            if (!questions || questions.length === 0) {
+                throw new Error("未能解析出题目，请检查文件格式");
+            }
+
+            // B. 存入 IndexedDB
+            const result = await window.storageService.importQuestions(bankName, questions);
+            
+            if (result.success) {
+                handleImportSuccess({ 
+                    success: true, 
+                    message: `成功导入 ${result.count} 道题目到 "${bankName}"`
+                });
+            } else {
+                throw new Error(result.error);
+            }
+
+        } catch (error) {
+            handleImportError(error);
+        }
+
+        document.getElementById('import-btn').disabled = false;
+    }
+    // 3. 传统 Web 环境 (上传到 Python Flask 后端)
+    else {
         // Web 环境导入
         const fileInput = document.getElementById('file-input');
 
@@ -174,28 +205,40 @@ async function importFile() {
             });
 
             const data = await response.json();
-
-            document.getElementById('import-progress').style.display = 'none';
-            const resultDiv = document.getElementById('import-result');
-            resultDiv.style.display = 'block';
-
+            
             if (data.success) {
-                resultDiv.className = 'import-result success';
-                resultDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message}`;
-                showToast(data.message, 'success');
-                clearFile();
-                document.getElementById('bank-name').value = '';
-                loadStats();
+                handleImportSuccess(data);
             } else {
-                resultDiv.className = 'import-result error';
-                resultDiv.innerHTML = `<i class="fas fa-times-circle"></i> ${data.error}`;
-                showToast(data.error, 'error');
+                handleImportError({ message: data.error });
             }
         } catch (error) {
-            document.getElementById('import-progress').style.display = 'none';
-            showToast('导入失败: ' + error.message, 'error');
+            handleImportError(error);
         }
 
         document.getElementById('import-btn').disabled = false;
     }
+}
+
+function handleImportSuccess(data) {
+    document.getElementById('import-progress').style.display = 'none';
+    const resultDiv = document.getElementById('import-result');
+    resultDiv.style.display = 'block';
+    
+    resultDiv.className = 'import-result success';
+    resultDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message}`;
+    showToast(data.message, 'success');
+    clearFile();
+    document.getElementById('bank-name').value = '';
+    loadStats();
+}
+
+function handleImportError(error) {
+    document.getElementById('import-progress').style.display = 'none';
+    const resultDiv = document.getElementById('import-result');
+    resultDiv.style.display = 'block';
+    
+    const msg = error.message || error.toString();
+    resultDiv.className = 'import-result error';
+    resultDiv.innerHTML = `<i class="fas fa-times-circle"></i> ${msg}`;
+    showToast('导入失败: ' + msg, 'error');
 }

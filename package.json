@@ -1,0 +1,32 @@
+{
+  "name": "dhu-redlesson-questionbank",
+  "version": "1.0.0",
+  "description": "基于 Web 的题库刷题系统，支持多格式题库导入、多种练习模式，可在局域网内多设备访问。\r （当前仅测试 2025-2026 第一学期习概/毛概/思修/近代史题库）",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "android": "npx cap run android",
+    "sync": "npx cap sync",
+    "open:android": "npx cap open android"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jialanhu0915/dhu-Redlesson-Questionbank.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/jialanhu0915/dhu-Redlesson-Questionbank/issues"
+  },
+  "homepage": "https://github.com/jialanhu0915/dhu-Redlesson-Questionbank#readme",
+  "devDependencies": {
+    "@capacitor/android": "^8.0.1",
+    "@capacitor/cli": "^8.0.1",
+    "@capacitor/core": "^8.0.1"
+  }
+}
