@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options),
     showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
     openExternal: (url) => ipcRenderer.invoke('open-external', url),
+    openDataFolder: () => ipcRenderer.invoke('open-data-folder'),
+    getDataPath: () => ipcRenderer.invoke('get-data-path'),
 
     // 题库管理
     getBanks: () => ipcRenderer.invoke('get-banks'),

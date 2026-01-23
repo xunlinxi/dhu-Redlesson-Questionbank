@@ -574,8 +574,7 @@ async function loadChapters(bankName) {
     try {
         let data;
         if (isElectron) {
-            const chapters = await window.electronAPI.getChapters(bankName);
-            data = { success: true, chapters };
+            data = await window.electronAPI.getChapters(bankName);
         } else {
             const response = await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bankName)}`);
             data = await response.json();
@@ -584,11 +583,13 @@ async function loadChapters(bankName) {
         const select = document.getElementById('filter-chapter');
         select.innerHTML = '<option value="">全部章节</option>';
         
-        if (data.success) {
-            data.chapters.forEach(chapter => {
-                select.innerHTML += `<option value="${chapter}">${chapter}</option>`;
-            });
-        }
+            if (data.success && Array.isArray(data.chapters)) {
+                data.chapters.forEach(chapter => {
+                    select.innerHTML += `<option value="${chapter}">${chapter}</option>`;
+                });
+            } else {
+                console.warn('loadPracticeChapters: 章节数据异常', data);
+            }
     } catch (error) {
         console.error('加载章节列表失败:', error);
     }
@@ -604,8 +605,7 @@ async function loadQuestions() {
             const filters = { bank: currentBankName };
             if (type) filters.type = type;
             if (chapter) filters.chapter = chapter;
-            const questions = await window.electronAPI.getQuestions(filters);
-            data = { success: true, questions };
+            data = await window.electronAPI.getQuestions(filters);
         } else {
             let url = `${API_BASE}/api/questions?bank=${encodeURIComponent(currentBankName)}`;
             if (type) url += `&type=${type}`;
@@ -860,10 +860,12 @@ async function loadPracticeOptions() {
         const select = document.getElementById('practice-bank');
         select.innerHTML = '<option value="">全部题库</option>';
         
-        if (data.success) {
+        if (data.success && Array.isArray(data.banks)) {
             data.banks.forEach(bank => {
                 select.innerHTML += `<option value="${bank.name}">${bank.name} (${bank.question_count}题)</option>`;
             });
+        } else {
+            console.warn('loadPracticeOptions: 题库数据异常', data);
         }
         
         // 绑定题库选择事件
@@ -888,8 +890,7 @@ async function loadPracticeChapters() {
         try {
             let data;
             if (isElectron) {
-                const chapters = await window.electronAPI.getChapters(bank);
-                data = { success: true, chapters };
+                data = await window.electronAPI.getChapters(bank);
             } else {
                 const response = await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bank)}`);
                 data = await response.json();
@@ -925,18 +926,30 @@ async function updateAvailableStats() {
         let singleCount = 0;
         let multiCount = 0;
         
-        let questionsUrl = `${API_BASE}/api/questions?`;
-        if (bank) questionsUrl += `bank=${encodeURIComponent(bank)}&`;
-        if (chapter) questionsUrl += `chapter=${encodeURIComponent(chapter)}&`;
+        let data;
+        if (isElectron) {
+            data = await window.electronAPI.getQuestions({
+                bank: bank,
+                chapter: chapter
+            });
+        } else {
+            let questionsUrl = `${API_BASE}/api/questions?`;
+            if (bank) questionsUrl += `bank=${encodeURIComponent(bank)}&`;
+            if (chapter) questionsUrl += `chapter=${encodeURIComponent(chapter)}&`;
+            
+            const response = await fetch(questionsUrl);
+            data = await response.json();
+        }
         
-        const response = await fetch(questionsUrl);
-        const data = await response.json();
-        
-        if (data.success) {
+        if (data.success && Array.isArray(data.questions)) {
             data.questions.forEach(q => {
                 if (q.type === 'single') singleCount++;
                 else multiCount++;
             });
+        } else {
+            console.warn('updateAvailableStats: 题目数据异常', data);
+            document.getElementById('available-single').textContent = 0;
+            document.getElementById('available-multi').textContent = 0;
         }
         
         document.getElementById('available-single').textContent = singleCount;
@@ -988,8 +1001,8 @@ async function startPractice(examMode = false) {
             const filters = { single_count: singleCount, multi_count: multiCount };
             if (bank) filters.bank = bank;
             if (chapter) filters.chapter = chapter;
-            const questions = await window.electronAPI.practiceRandom(filters);
-            data = { success: true, questions };
+            const responseData = await window.electronAPI.practiceRandom(filters);
+            data = responseData;
         } else {
             let url = `${API_BASE}/api/practice/random?single_count=${singleCount}&multi_count=${multiCount}`;
             if (bank) url += `&bank=${encodeURIComponent(bank)}`;
@@ -1888,10 +1901,15 @@ function browseDataPath() {
 // ==================== 排名系统 ====================
 async function loadRankings() {
     try {
-        const response = await fetch(`${API_BASE}/api/rankings`);
-        const data = await response.json();
+        let data;
+        if (isElectron) {
+            data = await window.electronAPI.getRankings();
+        } else {
+            const response = await fetch(`${API_BASE}/api/rankings`);
+            data = await response.json();
+        }
         
-        if (data.success) {
+        if (data && data.success) {
             renderRankings(data.rankings);
         }
     } catch (error) {
@@ -2095,8 +2113,8 @@ async function startSequencePractice() {
             const filters = { bank };
             if (chapter) filters.chapter = chapter;
             if (shuffleQuestions) filters.shuffle = true;
-            const questions = await window.electronAPI.practiceSequence(filters);
-            data = { success: true, questions };
+            const responseData = await window.electronAPI.practiceSequence(filters);
+            data = responseData;
         } else {
             let url = `${API_BASE}/api/practice/sequence?bank=${encodeURIComponent(bank)}`;
             if (chapter) url += `&chapter=${encodeURIComponent(chapter)}`;
@@ -2154,9 +2172,9 @@ async function startWrongPractice() {
         let data;
         if (isElectron) {
             const filters = { single_count: singleCount, multi_count: multiCount };
-            if (bank) filters.bank = bank;
-            const questions = await window.electronAPI.practiceWrong(filters);
-            data = { success: true, questions };
+            const responseData = await window.electronAPI.practiceWrong(filters);
+            data = responseData
+            data = await window.electronAPI.practiceWrong(filters);
         } else {
             let url = `${API_BASE}/api/practice/wrong?single_count=${singleCount}&multi_count=${multiCount}`;
             if (bank) url += `&bank=${encodeURIComponent(bank)}`;
@@ -2335,8 +2353,7 @@ async function loadWrongQuestions(bankName) {
     try {
         let data;
         if (isElectron) {
-            const questions = await window.electronAPI.getWrongbook({ bank: bankName });
-            data = { success: true, wrong_questions: questions };
+            data = await window.electronAPI.getWrongbook({ bank: bankName });
         } else {
             const response = await fetch(`${API_BASE}/api/wrongbook?bank=${encodeURIComponent(bankName)}`);
             data = await response.json();

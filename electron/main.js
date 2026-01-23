@@ -6,25 +6,202 @@ const os = require('os');
 
 let mainWindow;
 let pythonProcess;
+let appDataPath;
+let uploadsPath;
+let systemCachePath;
 
-// 设置全局 userDataPath，供 models/index.js 使用
-global.userDataPath = app.getPath('userData');
+/**
+ * 初始化 Electron 系统数据路径
+ * 在 app.whenReady() 之前调用，设置 userData 路径
+ */
+function initializeElectronDataPath() {
+    let userDataDir;
 
-// 应用数据目录
-const userDataPath = app.getPath('userData');
-const dataPath = path.join(userDataPath, 'data');
-const uploadsPath = path.join(userDataPath, 'uploads');
+    if (process.env.NODE_ENV === 'development') {
+        userDataDir = path.join(__dirname, 'system-cache');
+    } else {
+        const exePath = app.getPath('exe');
+        const appDir = path.dirname(exePath);
+        userDataDir = path.join(appDir, 'system-cache');
+    }
 
-// 确保目录存在
-fs.ensureDirSync(dataPath);
-fs.ensureDirSync(uploadsPath);
+    const testFile = path.join(userDataDir, '.write-test');
+    try {
+        fs.ensureDirSync(userDataDir);
+        fs.writeFileSync(testFile, 'test');
+        fs.unlinkSync(testFile);
 
-// 数据文件路径
-const questionsFilePath = path.join(dataPath, 'questions.json');
-const wrongbookFilePath = path.join(dataPath, 'wrongbook.json');
-const rankingsFilePath = path.join(dataPath, 'rankings.json');
-const progressFilePath = path.join(dataPath, 'progress.json');
-const configFilePath = path.join(dataPath, 'config.json');
+        app.setPath('userData', userDataDir);
+        app.setPath('sessionData', path.join(userDataDir, 'Session Storage'));
+        systemCachePath = userDataDir;
+
+        console.log('✅ Electron 系统数据位置:', userDataDir);
+        return userDataDir;
+    } catch (err) {
+        console.warn('⚠️  安装目录不可写（系统数据）:', err.message);
+        return null;
+    }
+}
+
+// 在 app.whenReady() 之前调用，设置 userData 路径
+initializeElectronDataPath();
+
+/**
+ * 初始化数据存储路径
+ * 同时设置业务数据和系统数据路径，如果不可写则提示用户选择
+ */
+function initializeDataPath() {
+    let installDirDataPath;
+    let defaultUserDataDir;
+
+    if (process.env.NODE_ENV === 'development') {
+        installDirDataPath = path.join(__dirname, '..', 'data');
+        defaultUserDataDir = path.join(os.homedir(), '.dhu-quiz-app');
+    } else {
+        const exePath = app.getPath('exe');
+        const appDir = path.dirname(exePath);
+        installDirDataPath = path.join(appDir, 'data');
+        defaultUserDataDir = path.join(os.homedir(), '.dhu-quiz-app');
+    }
+
+    let dataPath = installDirDataPath;
+
+    if (!systemCachePath) {
+        systemCachePath = path.join(defaultUserDataDir, 'system-cache');
+        app.setPath('userData', systemCachePath);
+        app.setPath('sessionData', path.join(systemCachePath, 'Session Storage'));
+        console.log('ℹ️  使用默认系统数据位置:', systemCachePath);
+    }
+
+    uploadsPath = path.join(path.dirname(dataPath), 'uploads');
+
+    const testFile = path.join(dataPath, '.write-test');
+    try {
+        fs.ensureDirSync(dataPath);
+        fs.ensureDirSync(uploadsPath);
+        fs.writeFileSync(testFile, 'test');
+        fs.unlinkSync(testFile);
+        appDataPath = dataPath;
+        console.log('✅ 数据存储位置:', appDataPath);
+        console.log('✅ 上传文件位置:', uploadsPath);
+        console.log('✅ 系统数据位置:', systemCachePath);
+    } catch (err) {
+        console.warn('⚠️  安装目录不可写:', err.message);
+
+        const result = dialog.showOpenDialogSync({
+            properties: ['openDirectory', 'createDirectory'],
+            title: '选择数据存储目录',
+            message: '安装目录无写入权限，请选择其他目录存储数据',
+            buttonLabel: '选择目录'
+        });
+
+        if (result && result[0]) {
+            appDataPath = path.join(result[0], 'data');
+            uploadsPath = path.join(result[0], 'uploads');
+            systemCachePath = path.join(result[0], 'system-cache');
+            fs.ensureDirSync(appDataPath);
+            fs.ensureDirSync(uploadsPath);
+            fs.ensureDirSync(systemCachePath);
+            try {
+                app.setPath('userData', systemCachePath);
+                app.setPath('sessionData', path.join(systemCachePath, 'Session Storage'));
+                console.log('✅ 系统数据位置已更新（用户选择）:', systemCachePath);
+            } catch (setPathErr) {
+                console.warn('⚠️  无法更新系统数据路径:', setPathErr.message);
+                console.log('💡 系统数据将保持在默认位置');
+            }
+            console.log('✅ 数据存储位置（用户选择）:', appDataPath);
+        } else {
+            appDataPath = path.join(systemCachePath, 'data');
+            uploadsPath = path.join(systemCachePath, 'uploads');
+            fs.ensureDirSync(appDataPath);
+            fs.ensureDirSync(uploadsPath);
+            console.log('✅ 数据存储位置（默认）:', appDataPath);
+        }
+    }
+
+    global.appDataPath = appDataPath;
+    global.systemCachePath = systemCachePath;
+
+    migrateOldData(appDataPath, systemCachePath);
+
+    return appDataPath;
+}
+
+/**
+ * 迁移旧数据
+ * 从 AppData 迁移到新的数据目录
+ */
+function migrateOldData(newDataPath, newSystemCachePath) {
+    if (process.env.NODE_ENV === 'development') {
+        return;
+    }
+
+    const oldUserData = app.getPath('userData', 'old');
+    const oldAppData = path.join(path.dirname(oldUserData), 'dhu-quiz-app');
+
+    let shouldMigrate = false;
+    let migrationSources = [];
+
+    if (fs.existsSync(path.join(oldAppData, 'data'))) {
+        migrationSources.push({
+            name: '题库数据',
+            source: path.join(oldAppData, 'data'),
+            target: newDataPath
+        });
+    }
+
+    if (fs.existsSync(oldAppData)) {
+        const hasSystemData = ['Cache', 'Local Storage', 'Session Storage', 'Preferences'].some(
+            dir => fs.existsSync(path.join(oldAppData, dir))
+        );
+        if (hasSystemData) {
+            migrationSources.push({
+                name: '系统缓存',
+                source: oldAppData,
+                target: newSystemCachePath
+            });
+        }
+    }
+
+    if (migrationSources.length === 0) {
+        return;
+    }
+
+    const migrationSummary = migrationSources.map(s => `  • ${s.name}`).join('\n');
+    const result = dialog.showMessageBoxSync({
+        type: 'question',
+        title: '检测到旧版本数据',
+        message: '检测到以下旧版本数据，是否迁移到新位置？\n\n' + migrationSummary,
+        buttons: ['迁移', '跳过'],
+        defaultId: 0
+    });
+
+    if (result === 0) {
+        try {
+            migrationSources.forEach(source => {
+                if (!fs.existsSync(source.target)) {
+                    fs.copySync(source.source, source.target, { overwrite: false });
+                    console.log('✅ 已迁移:', source.name);
+                }
+            });
+
+            dialog.showMessageBoxSync({
+                type: 'info',
+                title: '迁移完成',
+                message: '旧数据已成功迁移到新位置。\n\n' +
+                        '您可以手动删除旧数据目录：\n' + oldAppData
+            });
+        } catch (err) {
+            console.error('❌ 数据迁移失败:', err);
+            dialog.showMessageBoxSync({
+                type: 'error',
+                title: '迁移失败',
+                message: '数据迁移过程中发生错误：\n' + err.message
+            });
+        }
+    }
+}
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -72,6 +249,13 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+    const dataPath = initializeDataPath();
+    
+    // 初始化数据模型
+    const models = require('./models');
+    models.setDataPath(dataPath);
+    models.init();
+
     // 启动 Python 子进程（用于 Word 解析）
     startPythonProcess();
 
@@ -153,7 +337,10 @@ function startPythonProcess() {
             : path.join(process.resourcesPath, 'app.asar.unpacked');
 
         // 设置环境变量
-        const env = { ...process.env };
+        const env = { 
+            ...process.env,
+            PYTHONIOENCODING: 'utf-8' // 强制 Python 使用 UTF-8 编码，防止中文乱码
+        };
 
         // 如果使用嵌入式 Python，设置 PYTHONPATH
         if (useEmbedded) {
@@ -218,13 +405,29 @@ ipcMain.handle('open-external', async (event, url) => {
     shell.openExternal(url);
 });
 
+// 打开数据目录
+ipcMain.handle('open-data-folder', async () => {
+    try {
+        shell.openPath(appDataPath);
+        return { success: true, path: appDataPath };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// 获取数据目录路径
+ipcMain.handle('get-data-path', async () => {
+    return { success: true, path: appDataPath };
+});
+
 // 题库管理
 ipcMain.handle('get-banks', async () => {
     try {
         const banks = QuestionsModel.getBanks();
-        return { success: true, banks };
+        const banksArray = Array.isArray(banks) ? banks : [];
+        return { success: true, banks: banksArray };
     } catch (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: error.message, banks: [] };
     }
 });
 
@@ -286,25 +489,58 @@ ipcMain.handle('delete-question', async (event, questionId) => {
 // 章节
 ipcMain.handle('get-chapters', async (event, bank) => {
     try {
+        console.log('[get-chapters] 请求银行:', bank);
         const chapters = QuestionsModel.getChapters(bank);
-        return { success: true, chapters };
+        console.log('[get-chapters] 返回章节:', chapters, '类型:', typeof chapters, '长度:', chapters?.length);
+        // 确保返回数组
+        const chaptersArray = Array.isArray(chapters) ? chapters : [];
+        return { success: true, chapters: chaptersArray };
     } catch (error) {
-        return { success: false, error: error.message };
+        console.error('[get-chapters] 错误:', error);
+        return { success: false, error: error.message, chapters: [] };
     }
 });
 
 // 练习
 ipcMain.handle('practice-random', async (event, filters = {}) => {
     try {
-        const allQuestions = QuestionsModel.getQuestions(filters);
-        const count = filters.single_count || filters.multi_count || 10;
+        console.log('[practice-random] 收到请求，过滤器:', JSON.stringify(filters));
+        
+        // 1. 获取该题库下所有题目（不做数量限制）
+        const allQuestions = QuestionsModel.getQuestions({
+            bank: filters.bank,
+            chapter: filters.chapter
+            // 注意：这里不要传 type，因为我们要分别统计单选和多选
+        });
+        
+        console.log(`[practice-random] 找到总题目数: ${allQuestions.length}`);
 
-        // 随机抽取
-        const shuffled = allQuestions.sort(() => Math.random() - 0.5);
-        const questions = shuffled.slice(0, Math.min(count, shuffled.length));
+        // 2. 分离单选题和多选题
+        const singleQuestions = allQuestions.filter(q => q.type === 'single');
+        const multiQuestions = allQuestions.filter(q => q.type === 'multi');
+        
+        console.log(`[practice-random] 单选题: ${singleQuestions.length}, 多选题: ${multiQuestions.length}`);
 
-        return { success: true, questions, total: questions.length };
+        // 3. 按照请求数量抽取
+        const targetSingle = parseInt(filters.single_count) || 0;
+        const targetMulti = parseInt(filters.multi_count) || 0;
+        
+        // 随机混洗
+        const shuffledSingle = singleQuestions.sort(() => Math.random() - 0.5);
+        const shuffledMulti = multiQuestions.sort(() => Math.random() - 0.5);
+        
+        // 截取
+        const selectedSingle = shuffledSingle.slice(0, targetSingle);
+        const selectedMulti = shuffledMulti.slice(0, targetMulti);
+        
+        // 4. 合并结果
+        const finalQuestions = [...selectedSingle, ...selectedMulti];
+        
+        console.log(`[practice-random] 返回题目数: ${finalQuestions.length} (单:${selectedSingle.length} 多:${selectedMulti.length})`);
+
+        return { success: true, questions: finalQuestions, total: finalQuestions.length };
     } catch (error) {
+        console.error('[practice-random] 错误:', error);
         return { success: false, error: error.message };
     }
 });
@@ -596,13 +832,12 @@ ipcMain.handle('import-questions', async (event, filePath, bankName) => {
             parseResult.semester || ''
         );
 
-        // 移除同名题库的旧题目
-        const data = QuestionsModel.load();
-        data.questions = data.questions.filter(q => q.bank !== bankNameToUse);
-        QuestionsModel.save(data);
-
-        // 添加新题目
+        // 添加新题目（Model内部会自动清理旧数据并添加 bank 字段）
         QuestionsModel.addQuestions(bankNameToUse, parseResult.questions);
+
+        // 验证保存是否成功
+        const savedData = QuestionsModel.getQuestions({ bank: bankNameToUse });
+        console.log(`✅ 验证: 题库 '${bankNameToUse}' 当前共有 ${savedData.length} 道题目`);
 
         return {
             success: true,

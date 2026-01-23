@@ -38,6 +38,14 @@ except ImportError as e:
     sys.stderr.write(f"sys.path: {sys.path}\n")
     sys.exit(1)
 
+# 强制重新配置 stdin/stdout 为 utf-8 (双重保险，配合 Electron 端的环境变量)
+try:
+    if hasattr(sys.stdin, 'reconfigure'):
+        sys.stdin.reconfigure(encoding='utf-8')
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+except Exception as e:
+    sys.stderr.write(f"Warning: Failed to reconfigure sys.stdin/stdout encoding: {e}\n")
 
 def parse_document(file_path):
     """

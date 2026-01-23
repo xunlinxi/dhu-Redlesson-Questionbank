@@ -67,9 +67,17 @@ async function browseWrongBank(bankName) {
 // 加载错题列表
 async function loadWrongQuestions(bankName) {
     try {
-        const data = isElectron ?
-            await window.electronAPI.getWrongbook(bankName) :
-            await (await fetch(`${API_BASE}/api/wrongbook?bank=${encodeURIComponent(bankName)}`)).json();
+        let data;
+        if (isElectron) {
+            // Electron 环境：直接传输 filters 对象
+            const filters = { bank: bankName };
+            const responseData = await window.electronAPI.getWrongbook(filters);
+            data = responseData;
+        } else {
+            // Web 环境
+            const response = await fetch(`${API_BASE}/api/wrongbook?bank=${encodeURIComponent(bankName)}`);
+            data = await response.json();
+        }
         
         const questionList = document.getElementById('wrong-question-list');
         

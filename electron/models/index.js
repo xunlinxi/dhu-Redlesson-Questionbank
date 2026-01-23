@@ -5,31 +5,62 @@
 
 const fs = require('fs-extra');
 const path = require('path');
+const { app } = require('electron');
 
-// 应用数据目录 - 从全局获取（在 main.js 中设置）
-const userDataPath = global.userDataPath || require('electron').app.getPath('userData');
-const dataPath = path.join(userDataPath, 'data');
+let _dataPath = null;
 
-// 确保目录存在
-fs.ensureDirSync(dataPath);
-
-// 数据文件路径
-const getFilePath = (filename) => path.join(dataPath, filename);
-
-// 初始化数据文件
-const initDataFile = (filename, defaultData) => {
-    const filePath = getFilePath(filename);
-    if (!fs.existsSync(filePath)) {
-        fs.writeJsonSync(filePath, defaultData, { encoding: 'utf-8' });
-    }
+/**
+ * 设置数据目录路径
+ */
+const setDataPath = (path) => {
+    _dataPath = path;
+    console.log('✅ 数据模型路径已设置为:', _dataPath);
 };
 
-// 初始化所有数据文件
-initDataFile('questions.json', { banks: {}, questions: [] });
-initDataFile('wrongbook.json', { questions: [] });
-initDataFile('rankings.json', { records: [] });
-initDataFile('progress.json', { list: [] });
-initDataFile('config.json', { settings: {} });
+/**
+ * 获取数据目录路径
+ */
+const getDataPath = () => {
+    if (_dataPath) return _dataPath;
+    if (global.appDataPath) return global.appDataPath;
+    return path.join(path.dirname(app.getPath('exe')), 'data');
+};
+
+// 数据文件路径
+const getFilePath = (filename) => path.join(getDataPath(), filename);
+
+/**
+ * 初始化数据存储
+ * 必须在 main.js 确定好数据路径后调用
+ */
+const init = () => {
+    const dataPath = getDataPath();
+    
+    try {
+        // 确保目录存在
+        fs.ensureDirSync(dataPath);
+
+        // 初始化所有数据文件
+        const initDataFile = (filename, defaultData) => {
+            const filePath = path.join(dataPath, filename);
+            if (!fs.existsSync(filePath)) {
+                fs.writeJsonSync(filePath, defaultData, { encoding: 'utf-8' });
+            }
+        };
+
+        initDataFile('questions.json', { banks: {}, questions: [] });
+        initDataFile('wrongbook.json', { questions: [] });
+        initDataFile('rankings.json', { records: [] });
+        initDataFile('progress.json', { list: [] });
+        initDataFile('config.json', { settings: {} });
+        
+        console.log('✅ 数据模型初始化完成，路径:', dataPath);
+        return true;
+    } catch (error) {
+        console.error('❌ 数据模型初始化失败:', error);
+        return false;
+    }
+};
 
 /**
  * 读取 JSON 数据
@@ -37,6 +68,10 @@ initDataFile('config.json', { settings: {} });
 const readData = (filename) => {
     try {
         const filePath = getFilePath(filename);
+        if (!fs.existsSync(filePath)) {
+            // 文件不存在时不报错，交给上一层处理
+             return null;
+        }
         return fs.readJsonSync(filePath, { encoding: 'utf-8' });
     } catch (error) {
         console.error(`Error reading ${filename}:`, error);
@@ -50,6 +85,7 @@ const readData = (filename) => {
 const writeData = (filename, data) => {
     try {
         const filePath = getFilePath(filename);
+        fs.ensureDirSync(path.dirname(filePath));
         fs.writeJsonSync(filePath, data, { encoding: 'utf-8', indent: 2 });
         return true;
     } catch (error) {
@@ -94,14 +130,18 @@ const QuestionsModel = {
     getQuestions(filters = {}) {
         let questions = this.load().questions || [];
 
+        // 严格的 Bank 筛选
         if (filters.bank) {
             questions = questions.filter(q => q.bank === filters.bank);
         }
 
+        // 严格的类型筛选
         if (filters.type) {
-            questions = questions.filter(q => q.type === filters.type);
+             // 确保 type 存在再比较
+            questions = questions.filter(q => q.type && q.type === filters.type);
         }
 
+        // 严格的章节筛选
         if (filters.chapter) {
             questions = questions.filter(q => q.chapter === filters.chapter);
         }
@@ -115,18 +155,25 @@ const QuestionsModel = {
     },
 
     getChapters(bankName) {
+        // 验证参数
+        if (!bankName || typeof bankName !== 'string') {
+            console.warn('[getChapters] 无效的银行名称:', bankName);
+            return [];
+        }
+        
         const questions = this.load().questions || [];
         const chapters = new Set();
-
+        
         questions
             .filter(q => q.bank === bankName)
             .forEach(q => {
-                if (q.chapter) {
+                if (q.chapter && typeof q.chapter === 'string') {
                     chapters.add(q.chapter);
                 }
             });
-
-        return Array.from(chapters).sort();
+        
+        const result = Array.from(chapters).sort();
+        return result;
     },
 
     addBank(bankName, sourceFile, semester = '') {
@@ -162,8 +209,17 @@ const QuestionsModel = {
         // 移除同名题库的旧题目
         data.questions = data.questions.filter(q => q.bank !== bankName);
 
+        // 为新题目添加 bank 属性，确保数据完整性
+        const newQuestions = questions.map(q => ({ 
+            ...q, 
+            bank: bankName,
+            // 确保 type 字段存在且正确 (parser 有时可能返回 type: null) 
+            // 优先级：原数据type > 根据答案数量判断 > 默认为single
+            type: q.type ? q.type : (Array.isArray(q.answer) && q.answer.length > 1 ? 'multi' : 'single')
+        }));
+
         // 添加新题目
-        data.questions.push(...questions);
+        data.questions.push(...newQuestions);
 
         return this.save(data);
     },
@@ -397,6 +453,8 @@ const ConfigModel = {
 };
 
 module.exports = {
+    init,
+    setDataPath,
     QuestionsModel,
     WrongbookModel,
     RankingsModel,
