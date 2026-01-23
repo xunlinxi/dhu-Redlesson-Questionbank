@@ -1,0 +1,45 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies (Root)
+      run: npm install
+
+    - name: Install dependencies (Electron)
+      working-directory: ./electron
+      run: npm install
+
+    - name: Setup Embedded Python
+      working-directory: ./electron
+      # Run the project's scripts to download and configure the embedded Python environment
+      # This is crucial because standard 'setup-python' actions install global Python,
+      # but this app expects a portable embedded Python in 'electron/python/'
+      run: npm run setup-python
+
+    - name: Build Windows Executable
+      working-directory: ./electron
+      run: npm run build:win
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Windows-Installer
+        path: electron/dist/*.exe
