@@ -4,6 +4,9 @@
 appId: com.dhu.quiz
 productName: 东华红课题库刷题系统
 
+# 禁用自动发布到 GitHub，仅构建产物
+publish: null
+
 directories:
   output: dist
   buildResources: assets

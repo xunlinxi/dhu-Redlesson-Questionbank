@@ -62,8 +62,7 @@ temp/
 *.tmp
 *.bak
 
-# 测试文件
-tests/
+# 测试输出文件
 .pytest_cache/
 .coverage
 htmlcov/
