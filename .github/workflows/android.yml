@@ -34,9 +34,9 @@ jobs:
       working-directory: ./platforms/android
       run: npm ci
 
-    - name: Generate Cordova Plugins
+    - name: Sync Capacitor (generate cordova plugins only)
       working-directory: ./platforms/android
-      run: npx cap sync android --copy-files-only
+      run: npx cap sync android
 
     - name: Build Debug APK
       working-directory: ./platforms/android
