@@ -79,7 +79,6 @@ function initMobile() {
         console.log('桌面端环境，跳过移动端功能初始化');
     }
 }
-}
 
 // 检测是否为本地客户端
 function checkClientType() {
