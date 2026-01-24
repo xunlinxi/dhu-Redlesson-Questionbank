@@ -34,10 +34,6 @@ jobs:
       working-directory: ./platforms/android
       run: npm ci
 
-    - name: Sync Capacitor
-      working-directory: ./platforms/android
-      run: npx cap sync android
-
     - name: Build Debug APK
       working-directory: ./platforms/android
       run: |

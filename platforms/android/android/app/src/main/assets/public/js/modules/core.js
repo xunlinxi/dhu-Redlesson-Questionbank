@@ -14,8 +14,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('离线模式，跳过统计API加载');
     }
 
-    loadConfig();
-
     document.body.setAttribute('data-page', 'dashboard');
 
     window.changeNavPage = changeNavPage;

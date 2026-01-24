@@ -103,6 +103,10 @@ function initNavigation() {
 }
 
 function switchPage(page) {
+    // 移动/离线模式下隐藏设置页，强制跳转到首页
+    if ((window.isMobile && !window.isElectron) && page === 'settings') {
+        page = 'dashboard';
+    }
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.toggle('active', item.dataset.page === page);
     });
