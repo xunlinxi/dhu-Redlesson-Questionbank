@@ -72,8 +72,5 @@ function switchPage(page) {
             loadRankings();
             loadProgressList();
             break;
-        case 'settings':
-            loadConfig();
-            break;
     }
 }

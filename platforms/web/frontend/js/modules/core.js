@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initNavigation();
     initUpload();
     loadStats();
-    loadConfig();
     startHealthCheck();
     
     document.body.setAttribute('data-page', 'dashboard');
@@ -135,9 +134,6 @@ function switchPage(page) {
             showPracticeSettings();
             loadRankings();
             loadProgressList();
-            break;
-        case 'settings':
-            loadConfig();
             break;
     }
 }
