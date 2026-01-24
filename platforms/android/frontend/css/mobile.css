@@ -7,10 +7,101 @@ html {
     -ms-text-size-adjust: 100%;
 }
 
+/* Hide unused system settings view/navigation on mobile */
+#settings,
+[data-target="settings"] {
+    display: none !important;
+}
+
 * {
     touch-action: pan-x pan-y;
 }
 
+/* ==================== 可拖动悬浮菜单按钮 ==================== */
+.mobile-menu-btn {
+    display: none;
+    position: fixed;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    font-size: 18px;
+    cursor: move;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1001;
+    /* 初始位置将在 JS 中设置 */
+    transition: transform 0.1s ease, box-shadow 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-menu-btn.active {
+    background: var(--danger-color);
+}
+
+.mobile-menu-btn.dragging {
+    cursor: grabbing;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    transform: scale(1.1);
+}
+
+/* ==================== 物理返回按钮 ==================== */
+.back-btn {
+    display: none;
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.back-btn:active {
+    transform: scale(0.95);
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.back-btn:hover {
+    background: rgba(0, 0, 0, 0.75);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* ==================== 在小屏幕或 Capacitor 环境下显示 ==================== */
+@media screen and (max-width: 768px),
+.Capacitor {
+    .mobile-menu-btn,
+    .back-btn {
+        display: flex !important;
+    }
+}
+
+/* ==================== 确保悬浮按钮不遮挡内容 ==================== */
+.app-container {
+    /* 为悬浮按钮留出边距 */
+    padding-left: 60px;
+}
+
+@media screen and (max-width: 768px) {
+    .app-container {
+        padding-left: 0;
+    }
+}
+
+/* ==================== 手机端 (小于768px) ==================== */
 @media screen and (max-width: 768px) {
     html, body {
         overflow-x: hidden !important;

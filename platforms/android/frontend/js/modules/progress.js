@@ -1,11 +1,15 @@
 // ==================== 进度保存功能模块 ====================
 
+const progressUseMobileStore = window.useMobileStore ?? (window.useMobileStore = isMobile && !isElectron);
+
 // 加载进度列表
 async function loadProgressList() {
     try {
         let data;
         if (isElectron) {
             data = await window.electronAPI.getProgress();
+        } else if (progressUseMobileStore) {
+            data = await storageService.getProgress();
         } else {
             const response = await fetch(`${API_BASE}/api/progress`);
             data = await response.json();
@@ -73,11 +77,13 @@ async function saveCurrentProgress() {
     try {
         const data = isElectron ?
             await window.electronAPI.saveProgress(progressData) :
-            await (await fetch(`${API_BASE}/api/progress`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(progressData)
-            })).json();
+            progressUseMobileStore ?
+                await storageService.saveProgress(progressData) :
+                await (await fetch(`${API_BASE}/api/progress`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(progressData)
+                })).json();
         
         if (data.success) {
             // 更新当前进度ID
@@ -97,8 +103,11 @@ async function saveCurrentProgress() {
 // 加载进度
 async function loadProgress(progressId) {
     try {
-        const response = await fetch(`${API_BASE}/api/progress/${progressId}`);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.loadProgress(progressId) :
+            progressUseMobileStore ?
+                await storageService.getProgressById(progressId) :
+                await (await fetch(`${API_BASE}/api/progress/${progressId}`)).json();
         
         if (data.success) {
             const progress = data.progress;
@@ -107,7 +116,9 @@ async function loadProgress(progressId) {
             const questionIds = progress.question_ids || [];
             const questionsData = isElectron ?
                 await window.electronAPI.getQuestions() :
-                await (await fetch(`${API_BASE}/api/questions`)).json();
+                progressUseMobileStore ?
+                    { success: true, questions: await storageService.db.questions.toArray() } :
+                    await (await fetch(`${API_BASE}/api/questions`)).json();
             
             if (questionsData.success) {
                 // 按保存的顺序恢复题目
@@ -204,7 +215,9 @@ async function deleteProgress(progressId, silent = false) {
     try {
         const data = isElectron ?
             await window.electronAPI.deleteProgress(progressId) :
-            await (await fetch(`${API_BASE}/api/progress/${progressId}`, { method: 'DELETE' })).json();
+            progressUseMobileStore ?
+                await storageService.deleteProgress(progressId) :
+                await (await fetch(`${API_BASE}/api/progress/${progressId}`, { method: 'DELETE' })).json();
         
         if (data.success) {
             if (!silent) {

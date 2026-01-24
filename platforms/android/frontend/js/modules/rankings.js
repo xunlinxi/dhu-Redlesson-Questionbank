@@ -1,11 +1,15 @@
 // ==================== 排名系统模块 ====================
 
+const rankingsUseMobileStore = window.useMobileStore ?? (window.useMobileStore = isMobile && !isElectron);
+
 // 加载排名
 async function loadRankings() {
     try {
         const data = isElectron ?
             await window.electronAPI.getRankings() :
-            await (await fetch(`${API_BASE}/api/rankings`)).json();
+            rankingsUseMobileStore ?
+                await storageService.getRankings() :
+                await (await fetch(`${API_BASE}/api/rankings`)).json();
         
         if (data.success) {
             renderRankings(data.rankings);
@@ -65,11 +69,13 @@ async function saveRanking(record) {
     try {
         const data = isElectron ?
             await window.electronAPI.addRanking(record) :
-            await (await fetch(`${API_BASE}/api/rankings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(record)
-            })).json();
+            rankingsUseMobileStore ?
+                await storageService.saveRanking(record) :
+                await (await fetch(`${API_BASE}/api/rankings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(record)
+                })).json();
         
         if (data.success) {
             loadRankings();
@@ -88,7 +94,9 @@ async function clearRankings() {
             try {
                 const data = isElectron ?
                     await window.electronAPI.clearRankings() :
-                    await (await fetch(`${API_BASE}/api/rankings`, { method: 'DELETE' })).json();
+                    rankingsUseMobileStore ?
+                        await storageService.clearRankings() :
+                        await (await fetch(`${API_BASE}/api/rankings`, { method: 'DELETE' })).json();
                 
                 if (data.success) {
                     showToast('排名已清空', 'success');

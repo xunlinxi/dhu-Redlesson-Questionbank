@@ -3,8 +3,10 @@
 // 加载题库列表
 async function loadBanks() {
     try {
+        const useMobileStore = window.storageService && window.storageService.isMobile && !isElectron;
         const data = isElectron ? 
             await window.electronAPI.getBanks() :
+            useMobileStore ? await window.storageService.getBanks() :
             await (await fetch(`${API_BASE}/api/banks`)).json();
         
         const bankList = document.getElementById('bank-list');
@@ -80,8 +82,10 @@ async function browseBank(bankName) {
 // 加载章节列表
 async function loadChapters(bankName) {
     try {
+        const useMobileStore = window.storageService && window.storageService.isMobile && !isElectron;
         const data = isElectron ?
             await window.electronAPI.getChapters(bankName) :
+            useMobileStore ? await window.storageService.getChapters(bankName) :
             await (await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bankName)}`)).json();
         
         const select = document.getElementById('filter-chapter');
@@ -103,8 +107,10 @@ async function loadQuestions() {
     const chapter = document.getElementById('filter-chapter').value;
     
     try {
+        const useMobileStore = window.storageService && window.storageService.isMobile && !isElectron;
         const data = isElectron ?
             await window.electronAPI.getQuestions({ bank: currentBankName, type, chapter }) :
+            useMobileStore ? await window.storageService.getQuestions({ bank: currentBankName, type, chapter }) :
             (await fetch(`${API_BASE}/api/questions?bank=${encodeURIComponent(currentBankName)}${type ? `&type=${type}` : ''}${chapter ? `&chapter=${encodeURIComponent(chapter)}` : ''}`)).json();
         
         const questionList = document.getElementById('question-list');
@@ -175,8 +181,10 @@ function confirmDeleteBank(bankName) {
         `确定要删除题库"${bankName}"吗？该操作不可恢复。`,
         async () => {
             try {
+                const useMobileStore = window.storageService && window.storageService.isMobile && !isElectron;
                 const data = isElectron ?
                     await window.electronAPI.deleteBank(bankName) :
+                    useMobileStore ? await window.storageService.deleteBank(bankName) :
                     await (await fetch(`${API_BASE}/api/banks/${encodeURIComponent(bankName)}`, { method: 'DELETE' })).json();
                 
                 if (data.success) {
@@ -200,8 +208,10 @@ function confirmDeleteQuestion(questionId) {
         '确定要删除这道题目吗？该操作不可恢复。',
         async () => {
             try {
+                const useMobileStore = window.storageService && window.storageService.isMobile && !isElectron;
                 const data = isElectron ?
                     await window.electronAPI.deleteQuestion(questionId) :
+                    useMobileStore ? await window.storageService.deleteQuestion(questionId) :
                     await (await fetch(`${API_BASE}/api/questions/${questionId}`, { method: 'DELETE' })).json();
                 
                 if (data.success) {

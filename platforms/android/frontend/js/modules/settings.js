@@ -1,20 +1,27 @@
-// ==================== 设置模块 ====================
+// ==================== 设置模块 - 离线模式 ====================
 
 // 加载配置
 async function loadConfig() {
     try {
-        let data;
         if (isElectron) {
             data = await window.electronAPI.getConfig();
+            if (data.success) {
+                document.getElementById('data-path').value = data.config.data_path || '';
+                document.getElementById('current-data-file').textContent =
+                    data.config.data_path + '/' + data.config.questions_file;
+            }
+        } else if (window.storageService && window.storageService.isMobile) {
+            const config = localStorage.getItem('redlesson_config') || '{}';
+            document.getElementById('current-data-file').textContent = 'IndexedDB (本地存储)';
+            document.getElementById('data-path').value = JSON.parse(config).dataPath || '';
         } else {
             const response = await fetch(`${API_BASE}/api/config`);
-            data = await response.json();
-        }
-
-        if (data.success) {
-            document.getElementById('data-path').value = data.config.data_path || '';
-            document.getElementById('current-data-file').textContent =
-                data.config.data_path + '/' + data.config.questions_file;
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('data-path').value = data.config.data_path || '';
+                document.getElementById('current-data-file').textContent =
+                    data.config.data_path + '/' + data.config.questions_file;
+            }
         }
     } catch (error) {
         console.error('加载配置失败:', error);
@@ -25,18 +32,21 @@ async function loadConfig() {
 async function saveSettings() {
     const dataPath = document.getElementById('data-path').value.trim();
 
-    if (!dataPath) {
-        showToast('请输入数据存储路径', 'warning');
-        return;
-    }
-
     try {
-        let data;
         if (isElectron) {
             data = await window.electronAPI.saveConfig({
                 data_path: dataPath,
                 questions_file: 'questions.json'
             });
+            if (data.success) {
+                showToast('设置已保存', 'success');
+                loadConfig();
+            } else {
+                showToast(data.error, 'error');
+            }
+        } else if (window.storageService && window.storageService.isMobile) {
+            localStorage.setItem('redlesson_config', JSON.stringify({ dataPath }));
+            showToast('设置已保存', 'success');
         } else {
             const response = await fetch(`${API_BASE}/api/config`, {
                 method: 'POST',
@@ -47,14 +57,13 @@ async function saveSettings() {
                 })
             });
 
-            data = await response.json();
-        }
-
-        if (data.success) {
-            showToast('设置已保存', 'success');
-            loadConfig();
-        } else {
-            showToast(data.error, 'error');
+            const data = await response.json();
+            if (data.success) {
+                showToast('设置已保存', 'success');
+                loadConfig();
+            } else {
+                showToast(data.error, 'error');
+            }
         }
     } catch (error) {
         showToast('保存设置失败: ' + error.message, 'error');
@@ -77,8 +86,11 @@ function clearAllData() {
                         showToast('所有数据已清空', 'success');
                         loadStats();
                     }
+                } else if (window.storageService && window.storageService.isMobile) {
+                    await window.storageService.db.delete();
+                    showToast('所有数据已清空', 'success');
+                    loadStats();
                 } else {
-                    // 获取所有题库并删除
                     const response = await fetch(`${API_BASE}/api/banks`);
                     const data = await response.json();
 
@@ -101,5 +113,15 @@ function clearAllData() {
 
 // 浏览数据路径
 function browseDataPath() {
-    showToast('请在输入框中直接输入路径', 'warning');
+    if (isElectron) {
+        window.electronAPI.showOpenDialog({
+            properties: ['openDirectory']
+        }).then(result => {
+            if (!result.canceled && result.filePaths.length > 0) {
+                document.getElementById('data-path').value = result.filePaths[0];
+            }
+        });
+    } else {
+        showToast('请在输入框中直接输入路径', 'warning');
+    }
 }

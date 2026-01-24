@@ -1,11 +1,15 @@
 // ==================== 错题本功能模块 ====================
 
+const wrongbookUseMobileStore = window.useMobileStore ?? (window.useMobileStore = isMobile && !isElectron);
+
 // 加载错题题库列表
 async function loadWrongBanks() {
     try {
         const data = isElectron ?
             await window.electronAPI.getWrongbookStats() :
-            await (await fetch(`${API_BASE}/api/wrongbook/stats`)).json();
+            wrongbookUseMobileStore ?
+                await storageService.getWrongbookStats() :
+                await (await fetch(`${API_BASE}/api/wrongbook/stats`)).json();
         
         const bankList = document.getElementById('wrong-bank-list');
         
@@ -73,6 +77,9 @@ async function loadWrongQuestions(bankName) {
             const filters = { bank: bankName };
             const responseData = await window.electronAPI.getWrongbook(filters);
             data = responseData;
+        } else if (wrongbookUseMobileStore) {
+            const response = await storageService.getWrongBook(bankName);
+            data = response.success ? { success: true, wrong_questions: response.wrong_questions || response.questions || [] } : response;
         } else {
             // Web 环境
             const response = await fetch(`${API_BASE}/api/wrongbook?bank=${encodeURIComponent(bankName)}`);
@@ -130,7 +137,9 @@ async function removeFromWrongbook(questionId) {
     try {
         const data = isElectron ?
             await window.electronAPI.removeWrongQuestion(questionId) :
-            await (await fetch(`${API_BASE}/api/wrongbook/${questionId}`, { method: 'DELETE' })).json();
+            wrongbookUseMobileStore ?
+                await storageService.removeWrongQuestion(questionId) :
+                await (await fetch(`${API_BASE}/api/wrongbook/${questionId}`, { method: 'DELETE' })).json();
         
         if (data.success) {
             showToast('已从错题本移除', 'success');
@@ -162,6 +171,9 @@ function confirmClearWrongBank(bankName) {
                     } else {
                         data = { success: false, error: '获取错题失败' };
                     }
+                } else if (wrongbookUseMobileStore) {
+                    await storageService.db.wrongbook.where('bank').equals(bankName).delete();
+                    data = { success: true, message: `已清空"${bankName}"的所有错题` };
                 } else {
                     // Web 环境
                     const response = await fetch(`${API_BASE}/api/wrongbook/bank/${encodeURIComponent(bankName)}`, {
@@ -193,17 +205,21 @@ function clearWrongQuestionsByBank() {
 // 添加错题到错题本
 async function addToWrongbook(question, userAnswer) {
     try {
+        const payload = {
+            question_id: question.id,
+            bank: question.bank,
+            user_answer: userAnswer,
+            question: question
+        };
         const data = isElectron ?
             await window.electronAPI.addWrongQuestion({ questionId: question.id, user_answer: userAnswer, question }) :
-            await (await fetch(`${API_BASE}/api/wrongbook`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    question_id: question.id,
-                    user_answer: userAnswer,
-                    question: question
-                })
-            })).json();
+            wrongbookUseMobileStore ?
+                await storageService.addWrongQuestion(payload) :
+                await (await fetch(`${API_BASE}/api/wrongbook`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })).json();
     } catch (error) {
         console.error('添加错题失败:', error);
     }

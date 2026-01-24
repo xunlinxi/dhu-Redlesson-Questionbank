@@ -61,11 +61,11 @@ function initUpload() {
 }
 
 function handleFileSelectElectron(filePath, fileName) {
-    const allowedTypes = ['.txt', '.doc', '.docx'];
+    const allowedTypes = ['.txt', '.docx'];
     const ext = '.' + fileName.split('.').pop().toLowerCase();
 
     if (!allowedTypes.includes(ext)) {
-        showToast('请选择 .txt、.doc 或 .docx 格式的文件', 'error');
+        showToast('请选择 .txt 或 .docx 格式的文件', 'error');
         return;
     }
 
@@ -78,11 +78,11 @@ function handleFileSelectElectron(filePath, fileName) {
 }
 
 function handleFileSelectWeb(file) {
-    const allowedTypes = ['.txt', '.doc', '.docx'];
+    const allowedTypes = ['.txt', '.docx'];
     const ext = '.' + file.name.split('.').pop().toLowerCase();
 
     if (!allowedTypes.includes(ext)) {
-        showToast('请选择 .txt、.doc 或 .docx 格式的文件', 'error');
+        showToast('请选择 .txt 或 .docx 格式的文件', 'error');
         return;
     }
 

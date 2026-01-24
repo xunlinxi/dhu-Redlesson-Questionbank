@@ -39,10 +39,6 @@
                     <i class="fas fa-pen"></i>
                     <span>开始刷题</span>
                 </li>
-                <li class="nav-item" data-page="settings">
-                    <i class="fas fa-cog"></i>
-                    <span>系统设置</span>
-                </li>
             </ul>
         </nav>
 
@@ -443,34 +439,8 @@
                 </div>
             </div>
 
-            <!-- 设置页 -->
-            <div id="settings-page" class="page">
-                <h1>系统设置</h1>
-                <div class="settings-section">
-                    <div class="setting-item">
-                        <h3>数据存储路径</h3>
-                        <p class="setting-desc">题库数据将保存在此目录下</p>
-                        <div class="setting-control">
-                            <input type="text" id="data-path" class="form-control" placeholder="数据存储路径">
-                            <button class="btn btn-secondary" onclick="browseDataPath()">
-                                <i class="fas fa-folder-open"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <h3>当前数据文件</h3>
-                        <p class="setting-desc" id="current-data-file">-</p>
-                    </div>
-                    <div class="setting-actions">
-                        <button class="btn btn-primary" onclick="saveSettings()">
-                            <i class="fas fa-save"></i> 保存设置
-                        </button>
-                        <button class="btn btn-danger" onclick="clearAllData()">
-                            <i class="fas fa-trash"></i> 清空所有数据
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <!-- 设置页（隐藏占位，已禁用） -->
+            <div id="settings-page" class="page" style="display: none;"></div>
         </main>
     </div>
 

@@ -1,5 +1,7 @@
 // ==================== 做题模式切换模块 ====================
 
+const modesUseMobileStore = window.useMobileStore ?? (window.useMobileStore = isMobile && !isElectron);
+
 // 做题模式切换
 function onPracticeModeChange() {
     const mode = document.getElementById('practice-mode').value;
@@ -36,10 +38,11 @@ function onPracticeModeChange() {
 async function updateWrongQuestionStats() {
     try {
         const bank = document.getElementById('practice-bank').value;
-        let url = `${API_BASE}/api/wrongbook/stats`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.getWrongbookStats() :
+            modesUseMobileStore ?
+                await storageService.getWrongbookStats() :
+                await (await fetch(`${API_BASE}/api/wrongbook/stats`)).json();
         
         if (data.success) {
             let singleCount = 0;
@@ -106,8 +109,11 @@ async function startSequencePractice() {
     if (shuffleQuestions) url += `&shuffle=true`;
     
     try {
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.practiceSequence({ bank, chapter, shuffle: shuffleQuestions }) :
+            modesUseMobileStore ?
+                await storageService.getPracticeSequence({ bank, chapter, shuffle: shuffleQuestions }) :
+                await (await fetch(url)).json();
         
         if (data.success && data.questions.length > 0) {
             practiceQuestions = data.questions.map(q => {
@@ -157,8 +163,11 @@ async function startWrongPractice() {
     if (bank) url += `&bank=${encodeURIComponent(bank)}`;
     
     try {
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = isElectron ?
+            await window.electronAPI.practiceWrong({ bank, single_count: singleCount, multi_count: multiCount }) :
+            modesUseMobileStore ?
+                await storageService.getPracticeWrong({ bank, single_count: singleCount, multi_count: multiCount }) :
+                await (await fetch(url)).json();
         
         if (data.success && data.questions.length > 0) {
             practiceQuestions = data.questions.map(q => {

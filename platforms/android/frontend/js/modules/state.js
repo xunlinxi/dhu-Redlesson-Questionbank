@@ -4,6 +4,13 @@
 
 const API_BASE = '';
 
+// ==================== 环境检测 ====================
+const isElectron = window.electronAPI !== undefined;
+const isMobile = window.Capacitor !== undefined;
+const isOffline = !isElectron && (isMobile || window.location.protocol === 'file:');
+
+console.log('环境检测 - isElectron:', isElectron, 'isMobile:', isMobile, 'isOffline:', isOffline);
+
 // 全局状态变量
 let currentPage = 'dashboard';
 let practiceQuestions = [];

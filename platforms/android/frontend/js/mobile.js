@@ -5,6 +5,15 @@
 // 全局变量
 var isLocalClient = true;
 var mobileMenuOpen = false;
+var mobileInitialized = false;
+var dragMoved = false;
+
+// 拖动状态
+var isDragging = false;
+var dragStartX = 0;
+var dragStartY = 0;
+var menuBtnStartX = 0;
+var menuBtnStartY = 0;
 
 // 页面加载完成后初始化
 window.addEventListener('load', function() {
@@ -13,6 +22,16 @@ window.addEventListener('load', function() {
         initMobile();
     }, 100);
 });
+
+// 新增：如果页面已经加载完成，立即执行
+if (document.readyState === 'complete') {
+    setTimeout(function() {
+        console.log('页面已加载完成，立即初始化移动端');
+        if (typeof initMobile === 'function') {
+            initMobile();
+        }
+    }, 100);
+}
 
 // 禁止双指缩放
 document.addEventListener('gesturestart', function(e) {
@@ -30,13 +49,36 @@ document.addEventListener('touchend', function(e) {
 }, { passive: false });
 
 function initMobile() {
-    // 1. 检测客户端类型
-    checkClientType();
-    
-    // 2. 如果是小屏幕，初始化移动端菜单
-    if (window.innerWidth < 768) {
-        createMobileMenu();
+    // 防止重复初始化
+    if (mobileInitialized) {
+        console.log('移动端已初始化，跳过重复调用');
+        return;
     }
+
+    mobileInitialized = true;
+
+    console.log('=== 移动端初始化开始 ===');
+    console.log('屏幕宽度:', window.innerWidth);
+    console.log('屏幕高度:', window.innerHeight);
+    console.log('Capacitor:', window.Capacitor !== undefined);
+    console.log('Electron:', window.electronAPI !== undefined);
+
+    //1. 检测客户端类型
+    checkClientType();
+
+    //2. 强制在 Capacitor 环境或小屏幕下初始化移动端功能
+    if (window.Capacitor !== undefined || window.innerWidth < 768) {
+        console.log('检测到移动端环境，初始化移动端功能...');
+
+        createMobileMenu();
+        initDraggableMenu();
+        createBackButton();
+
+        console.log('✓ 移动端功能初始化完成');
+    } else {
+        console.log('桌面端环境，跳过移动端功能初始化');
+    }
+}
 }
 
 // 检测是否为本地客户端
@@ -47,6 +89,14 @@ function checkClientType() {
         return;
     }
 
+    // Capacitor/离线模式是本地客户端
+    if (window.Capacitor !== undefined || (window.storageService && window.storageService.isMobile)) {
+        isLocalClient = true;
+        showRemoteBadge();
+        return;
+    }
+
+    // Web 环境：尝试连接服务器
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/api/client/info', true);
     xhr.onreadystatechange = function() {
@@ -134,6 +184,176 @@ function toggleMenu() {
 function closeMenu() {
     if (mobileMenuOpen) {
         toggleMenu();
+    }
+}
+
+// ==================== 可拖动悬浮菜单 ====================
+function initDraggableMenu() {
+    console.log('初始化可拖动菜单...');
+
+    var btn = document.querySelector('.mobile-menu-btn');
+    if (!btn) {
+        console.warn('移动端菜单按钮未找到');
+        return;
+    }
+
+    // 从 localStorage 恢复位置，如果没有则使用默认
+    var savedPos = localStorage.getItem('mobileMenuBtnPos');
+    if (savedPos) {
+        var pos = JSON.parse(savedPos);
+        btn.style.left = pos.x + 'px';
+        btn.style.top = pos.y + 'px';
+        console.log('恢复菜单按钮位置:', pos);
+    } else {
+        // 默认位置：垂直居中左侧
+        var defaultTop = (window.innerHeight - 44) / 2;
+        btn.style.left = '8px';
+        btn.style.top = defaultTop + 'px';
+        console.log('使用默认菜单按钮位置:', { x: 8, y: defaultTop });
+    }
+
+    // 绑定拖动事件
+    btn.addEventListener('touchstart', handleDragStart, { passive: false });
+    btn.addEventListener('touchmove', handleDragMove, { passive: false });
+    btn.addEventListener('touchend', handleDragEnd);
+    btn.addEventListener('mousedown', handleDragStart);
+    btn.addEventListener('mousemove', handleDragMove);
+    btn.addEventListener('mouseup', handleDragEnd);
+    btn.addEventListener('mouseleave', handleDragEnd);
+
+    console.log('✓ 可拖动菜单初始化完成');
+}
+
+function handleDragStart(e) {
+    e.preventDefault();
+
+    dragMoved = false;
+
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    isDragging = true;
+    dragStartX = clientX;
+    dragStartY = clientY;
+
+    var btn = document.querySelector('.mobile-menu-btn');
+    menuBtnStartX = btn.offsetLeft;
+    menuBtnStartY = btn.offsetTop;
+
+    btn.classList.add('dragging');
+    console.log('开始拖动');
+}
+
+function handleDragMove(e) {
+    if (!isDragging) return;
+
+    e.preventDefault();
+
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    var deltaX = clientX - dragStartX;
+    var deltaY = clientY - dragStartY;
+
+    if (!dragMoved && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
+        dragMoved = true;
+    }
+
+    var newX = menuBtnStartX + deltaX;
+    var newY = menuBtnStartY + deltaY;
+
+    // 限制在屏幕内
+    var windowWidth = window.innerWidth;
+    var windowHeight = window.innerHeight;
+    var btnSize = 44; // 按钮大小
+
+    newX = Math.max(8, Math.min(newX, windowWidth - btnSize - 8));
+    newY = Math.max(8, Math.min(newY, windowHeight - btnSize - 8));
+
+    var btn = document.querySelector('.mobile-menu-btn');
+    btn.style.left = newX + 'px';
+    btn.style.top = newY + 'px';
+}
+
+function handleDragEnd(e) {
+    if (!isDragging) return;
+
+    isDragging = false;
+
+    var btn = document.querySelector('.mobile-menu-btn');
+    btn.classList.remove('dragging');
+
+    if (!dragMoved) {
+        // 视为点击，切换菜单
+        toggleMenu();
+        return;
+    }
+
+    // 保存位置到 localStorage
+    var pos = {
+        x: btn.offsetLeft,
+        y: btn.offsetTop
+    };
+    localStorage.setItem('mobileMenuBtnPos', JSON.stringify(pos));
+    console.log('保存菜单按钮位置:', pos);
+}
+
+// ==================== 物理返回按钮 ====================
+function createBackButton() {
+    console.log('创建物理返回按钮...');
+
+    // 检查是否已存在
+    if (document.querySelector('.back-btn')) {
+        console.log('返回按钮已存在，跳过创建');
+        return;
+    }
+
+    var btn = document.createElement('button');
+    btn.className = 'back-btn';
+    btn.innerHTML = '<i class="fas fa-arrow-left"></i>';
+    btn.type = 'button';
+    btn.onclick = handleBack;
+
+    document.body.appendChild(btn);
+    console.log('✓ 物理返回按钮创建完成');
+}
+
+// 处理返回操作
+function handleBack() {
+    console.log('处理返回操作，当前页面:', currentPage);
+
+    // 判断当前页面状态
+    var questionBrowser = document.getElementById('question-browser');
+    var wrongQuestionBrowser = document.getElementById('wrong-question-browser');
+
+    // 优先级 1: 在题库详情页 → 返回题库列表
+    if (questionBrowser && questionBrowser.style.display !== 'none') {
+        console.log('从题库详情页返回列表');
+        if (typeof showBankList === 'function') {
+            showBankList();
+        } else {
+            console.warn('showBankList 函数未定义');
+        }
+        return;
+    }
+
+    // 优先级 2: 在错题详情页 → 返回错题列表
+    if (wrongQuestionBrowser && wrongQuestionBrowser.style.display !== 'none') {
+        console.log('从错题详情页返回列表');
+        if (typeof showWrongBankList === 'function') {
+            showWrongBankList();
+        } else {
+            console.warn('showWrongBankList 函数未定义');
+        }
+        return;
+    }
+
+    // 优先级 3: 其他页面 → 返回首页
+    console.log('返回首页');
+    if (typeof switchPage === 'function') {
+        switchPage('dashboard');
+    } else {
+        console.warn('switchPage 函数未定义');
     }
 }
 

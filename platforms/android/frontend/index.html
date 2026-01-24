@@ -109,9 +109,9 @@
                     <div class="upload-area" id="upload-area">
                         <i class="fas fa-cloud-upload-alt"></i>
                         <p>拖拽文件到此处或点击上传</p>
-                        <p class="hint">支持 .txt、.doc、.docx 格式<br><small>推荐使用TXT格式避免Word自动编号问题；doc/docx会自动转换为文本处理</small>
+                        <p class="hint">支持 .txt、.docx 格式<br><small>推荐使用TXT格式避免Word自动编号问题</small>
                         </p>
-                        <input type="file" id="file-input" accept=".txt,.doc,.docx" hidden>
+                        <input type="file" id="file-input" accept=".txt,.docx" hidden>
                     </div>
 
                     <div class="import-form">
@@ -533,8 +533,43 @@
     <script src="js/modules/storage.js"></script>
     <script src="js/modules/parser.js"></script>
 
-    <script src="js/app.js"></script>
-    <script src="js/mobile.js"></script>
+    <!-- 模块化版本 - 完全离线模式 -->
+    <script src="js/modules/state.js"></script>
+    <script src="js/modules/utils.js"></script>
+    <script src="js/modules/core.js"></script>
+    <script src="js/modules/stats.js"></script>
+    <script src="js/modules/upload.js"></script>
+    <script src="js/modules/banks.js"></script>
+    <script src="js/modules/practice.js"></script>
+    <script src="js/modules/modes.js"></script>
+    <script src="js/modules/settings.js"></script>
+    <script src="js/modules/rankings.js"></script>
+    <script src="js/modules/wrongbook.js"></script>
+    <script src="js/modules/progress.js"></script>
+
+    <!-- 初始化全局服务 -->
+    <script>
+        // 添加 Capacitor 平台类名到 body
+        if (window.Capacitor !== undefined) {
+            document.body.classList.add('Capacitor');
+            console.log('✓ Capacitor 环境检测成功');
+        }
+
+        // 初始化全局服务
+        window.storageService = new StorageService();
+        window.questionParser = new QuestionParser();
+        console.log('完全离线模式已启用');
+
+        // 延迟初始化移动端功能，确保所有模块已加载
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                console.log('=== 应用加载完成 ===');
+                if (typeof initMobile === 'function') {
+                    initMobile();
+                }
+            }, 200);
+        });
+    </script>
 </body>
 
 </html>

@@ -1,11 +1,15 @@
 // ==================== 刷题功能模块 ====================
 
+const practiceUseMobileStore = window.useMobileStore ?? (window.useMobileStore = isMobile && !isElectron);
+
 // 加载刷题选项
 async function loadPracticeOptions() {
     try {
         const data = isElectron ?
             await window.electronAPI.getBanks() :
-            await (await fetch(`${API_BASE}/api/banks`)).json();
+            practiceUseMobileStore ?
+                await storageService.getBanks() :
+                await (await fetch(`${API_BASE}/api/banks`)).json();
         
         const select = document.getElementById('practice-bank');
         select.innerHTML = '<option value="">全部题库</option>';
@@ -39,7 +43,9 @@ async function loadPracticeChapters() {
         try {
             const data = isElectron ?
                 await window.electronAPI.getChapters(bank) :
-                await (await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bank)}`)).json();
+                practiceUseMobileStore ?
+                    await storageService.getChapters(bank) :
+                    await (await fetch(`${API_BASE}/api/chapters?bank=${encodeURIComponent(bank)}`)).json();
             
             if (data.success) {
                 data.chapters.forEach(chapter => {
@@ -74,7 +80,9 @@ async function updateAvailableStats() {
 
         const data = isElectron ?
             await window.electronAPI.getQuestions({ bank, chapter }) :
-            await (await fetch(`${API_BASE}/api/questions?bank=${encodeURIComponent(bank)}${chapter ? `&chapter=${encodeURIComponent(chapter)}` : ''}`)).json();
+            practiceUseMobileStore ?
+                await storageService.getQuestions({ bank, chapter }) :
+                await (await fetch(`${API_BASE}/api/questions?bank=${encodeURIComponent(bank)}${chapter ? `&chapter=${encodeURIComponent(chapter)}` : ''}`)).json();
         
         if (data.success) {
             data.questions.forEach(q => {
@@ -135,7 +143,9 @@ async function startPractice(examMode = false) {
     try {
         const data = isElectron ?
             await window.electronAPI.practiceRandom({ bank, chapter, single_count: singleCount, multi_count: multiCount }) :
-            await (await fetch(url)).json();
+            practiceUseMobileStore ?
+                await storageService.getPracticeRandom({ bank, chapter, single_count: singleCount, multi_count: multiCount }) :
+                await (await fetch(url)).json();
         
         if (data.success && data.questions.length > 0) {
             practiceQuestions = data.questions.map(q => {
