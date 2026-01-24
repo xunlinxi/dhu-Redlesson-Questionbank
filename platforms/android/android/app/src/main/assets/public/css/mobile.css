@@ -1,0 +1,818 @@
+/* ==================== 移动端适配样式 - 简化版 ==================== */
+
+/* 强制禁止缩放 */
+html {
+    touch-action: pan-x pan-y;
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+}
+
+/* Hide unused system settings view/navigation on mobile */
+#settings,
+[data-target="settings"] {
+    display: none !important;
+}
+
+* {
+    touch-action: pan-x pan-y;
+}
+
+/* ==================== 可拖动悬浮菜单按钮 ==================== */
+.mobile-menu-btn {
+    display: none;
+    position: fixed;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    font-size: 18px;
+    cursor: move;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1001;
+    /* 初始位置将在 JS 中设置 */
+    transition: transform 0.1s ease, box-shadow 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-menu-btn.active {
+    background: var(--danger-color);
+}
+
+.mobile-menu-btn.dragging {
+    cursor: grabbing;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    transform: scale(1.1);
+}
+
+/* ==================== 物理返回按钮 ==================== */
+.back-btn {
+    display: none;
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.back-btn:active {
+    transform: scale(0.95);
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.back-btn:hover {
+    background: rgba(0, 0, 0, 0.75);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* ==================== 在小屏幕或 Capacitor 环境下显示 ==================== */
+@media screen and (max-width: 768px),
+.Capacitor {
+    .mobile-menu-btn,
+    .back-btn {
+        display: flex !important;
+    }
+}
+
+/* ==================== 确保悬浮按钮不遮挡内容 ==================== */
+.app-container {
+    /* 为悬浮按钮留出边距 */
+    padding-left: 60px;
+}
+
+@media screen and (max-width: 768px) {
+    .app-container {
+        padding-left: 0;
+    }
+}
+
+/* ==================== 手机端 (小于768px) ==================== */
+@media screen and (max-width: 768px) {
+    html, body {
+        overflow-x: hidden !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+    }
+    
+    .app-container,
+    .main-content,
+    .page,
+    .manage-section,
+    .question-browser,
+    .bank-list {
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+    }
+}
+
+/* 移动端菜单按钮 - 绝对定位不占空间 */
+.mobile-menu-btn {
+    display: none;
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    z-index: 1001;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.mobile-menu-btn.active {
+    background: var(--danger-color);
+}
+
+/* 侧边栏遮罩 */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+/* 本地存储模式指示器 */
+.storage-mode-badge {
+    display: none;
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 100;
+    padding: 4px 10px;
+    background: var(--warning-color);
+    color: white;
+    border-radius: 15px;
+    font-size: 11px;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 远程模式下只在首页显示本地存储标识 */
+body.remote-mode .storage-mode-badge {
+    display: block;
+}
+
+body.remote-mode:not([data-page="home"]) .storage-mode-badge {
+    display: none !important;
+}
+
+/* 隐藏远程用户的管理功能 */
+body.remote-mode .nav-item[data-page="import"],
+body.remote-mode .nav-item[data-page="settings"],
+body.remote-mode .import-btn {
+    display: none !important;
+}
+
+body.remote-mode .bank-actions .btn-danger,
+body.remote-mode .question-item .btn-danger {
+    display: none !important;
+}
+
+/* ==================== 平板端 (768px - 1024px) ==================== */
+@media screen and (max-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .practice-layout {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .practice-main {
+        width: 100%;
+        min-width: 0;
+    }
+    
+    .side-panels {
+        width: 300px;
+        min-width: 300px;
+        max-width: 300px;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .side-panel {
+        flex: none;
+        width: 300px;
+        min-width: 300px;
+        max-width: 300px;
+    }
+}
+
+/* ==================== 手机端 (小于768px) ==================== */
+@media screen and (max-width: 768px) {
+    /* 显示菜单按钮 */
+    .mobile-menu-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* 侧边栏 */
+    .sidebar {
+        position: fixed;
+        left: -250px;
+        width: 250px;
+        z-index: 1000;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 15px rgba(0, 0, 0, 0.2);
+        padding: 20px 0;
+    }
+    
+    .sidebar.open {
+        left: 0;
+    }
+    
+    .sidebar .logo span,
+    .sidebar .nav-item span {
+        display: inline !important;
+    }
+    
+    .sidebar .logo {
+        padding: 0 20px 30px;
+        justify-content: flex-start;
+    }
+    
+    .sidebar .nav-item {
+        justify-content: flex-start;
+        padding: 15px 20px;
+    }
+    
+    /* 主内容区 */
+    .main-content {
+        margin-left: 0;
+        padding: 8px 10px 10px 10px; /* 减少顶部边距 */
+    }
+    
+    /* 页面标题 */
+    .page h1 {
+        font-size: 16px;
+        margin-bottom: 8px;
+        margin-top: 0;
+    }
+    
+    /* 统计卡片 */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    
+    .stat-card {
+        padding: 15px;
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .stat-icon {
+        width: 45px;
+        height: 45px;
+        font-size: 18px;
+    }
+    
+    .stat-value {
+        font-size: 24px;
+    }
+    
+    .stat-label {
+        font-size: 12px;
+    }
+    
+    /* 快速操作 */
+    .quick-actions {
+        padding: 15px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .action-buttons .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    /* 章节统计 */
+    .chapter-stats {
+        padding: 15px;
+    }
+    
+    .chapter-list {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    /* 刷题页面 */
+    .practice-page-header {
+        flex-direction: column;
+        gap: 0;
+        margin-bottom: 4px;
+        margin-top: 0;
+        padding-top: 0;
+    }
+    
+    /* 隐藏标题时不占用空间 */
+    .practice-page-header h1 {
+        font-size: 16px;
+        margin-bottom: 0;
+        margin-top: 0;
+    }
+    
+    .practice-page-header h1[style*="display: none"] {
+        height: 0;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* 刷题进度条 - 紧凑单行显示，左边留出菜单按钮空间 */
+    .practice-header-info {
+        position: relative;
+        z-index: 100;
+        flex-direction: row !important;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 10px;
+        padding-left: 50px; /* 留出菜单按钮位置 */
+        background: var(--card-bg);
+        border-radius: 6px;
+        font-size: 12px;
+        margin-top: 0;
+        min-height: 36px;
+    }
+    
+    .practice-header-info .progress-info {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .practice-header-info .progress-info span {
+        font-size: 12px;
+    }
+    
+    .practice-header-info .timer-display {
+        font-size: 12px;
+        padding: 2px 6px;
+    }
+    
+    .practice-header-info .score-info {
+        display: flex;
+        gap: 8px;
+        font-size: 12px;
+    }
+    
+    .practice-header-info .btn {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+    
+    .practice-mode-badge {
+        font-size: 10px !important;
+        padding: 2px 6px !important;
+    }
+    
+    .practice-layout {
+        flex-direction: column;
+    }
+    
+    .practice-main {
+        padding: 10px;
+    }
+    
+    /* 设置卡片 */
+    .settings-row-top,
+    .settings-row-bottom {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .settings-card {
+        padding: 15px;
+    }
+    
+    /* 题目显示 */
+    .question-card {
+        padding: 12px;
+    }
+    
+    /* 题目头部 - 单行显示类型、编号、章节 */
+    .question-header {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+    
+    .question-type {
+        font-size: 11px;
+        padding: 2px 6px;
+    }
+    
+    .question-id-badge {
+        font-size: 10px;
+        padding: 2px 5px;
+    }
+    
+    .question-chapter {
+        font-size: 11px;
+    }
+    
+    .question-tags {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    
+    .question-content {
+        font-size: 14px;
+        line-height: 1.4;
+        margin-bottom: 8px;
+    }
+    
+    /* 长题目缩小字体 */
+    .question-content.long-text {
+        font-size: 13px;
+        line-height: 1.35;
+    }
+    
+    /* 选项按钮 */
+    .option-btn {
+        padding: 8px 10px;
+        font-size: 13px;
+        min-height: 40px;
+        line-height: 1.3;
+    }
+    
+    .options-list {
+        gap: 6px;
+    }
+    
+    /* 题目操作按钮 */
+    .practice-actions {
+        gap: 8px;
+        margin-top: 10px;
+    }
+    
+    .practice-actions .btn {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+    
+    /* 答案结果 */
+    .answer-result {
+        padding: 8px 12px;
+        font-size: 13px;
+        margin-top: 10px;
+    }
+    
+    .option-item {
+        padding: 8px 10px;
+        font-size: 13px;
+        line-height: 1.3;
+    }
+    
+    /* 答题操作 */
+    .practice-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .practice-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    /* 题库管理 */
+    .bank-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .bank-info {
+        margin-bottom: 10px;
+    }
+    
+    .bank-stats {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .bank-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .bank-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    /* 题目浏览器 - 手机端适配 */
+    .question-browser {
+        padding: 10px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .browser-header {
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+    
+    .browser-header h2 {
+        font-size: 14px;
+        word-break: break-all;
+    }
+    
+    .browser-header .btn {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    
+    /* 筛选栏 */
+    .filter-bar {
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+    
+    .filter-bar select {
+        width: 100%;
+        padding: 8px;
+        font-size: 13px;
+    }
+    
+    .filter-bar .inline-toggle {
+        font-size: 13px;
+    }
+    
+    .browser-filters {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .browser-filters select {
+        width: 100%;
+    }
+    
+    .question-list {
+        gap: 10px;
+    }
+    
+    /* 题目列表项 - 手机端 */
+    .question-item {
+        padding: 10px;
+    }
+    
+    .question-item .question-header {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-bottom: 8px;
+    }
+    
+    .question-item .question-content {
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+    
+    .question-item .question-options {
+        gap: 5px;
+    }
+    
+    .question-item .option-item {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+    
+    .question-item .question-answer {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+    
+    .question-item .question-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    
+    .question-item .question-actions .btn {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+    
+    /* 开始刷题按钮 */
+    .practice-start-btn {
+        width: 100%;
+        padding: 15px 30px;
+        font-size: 16px;
+    }
+    
+    /* 排行榜 */
+    .ranking-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .ranking-info {
+        width: 100%;
+    }
+    
+    /* 弹窗 - 确认弹窗使用小窗口 */
+    .modal-content {
+        width: 85%;
+        max-width: 320px;
+        margin: auto;
+        max-height: 70vh;
+        overflow-y: auto;
+        border-radius: 10px;
+    }
+    
+    .modal-header {
+        padding: 10px 12px;
+        font-size: 15px;
+    }
+    
+    .modal-header h3 {
+        margin: 0;
+        font-size: 15px;
+    }
+    
+    .modal-body {
+        padding: 10px 12px;
+        font-size: 13px;
+    }
+    
+    .modal-body p {
+        margin: 0;
+    }
+    
+    .modal-footer {
+        padding: 8px 12px;
+        gap: 8px;
+    }
+    
+    .modal-footer .btn {
+        padding: 6px 14px;
+        font-size: 12px;
+    }
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+    
+    /* 存储模式标识 */
+    .storage-mode-badge {
+        top: 15px;
+        right: 70px;
+        font-size: 11px;
+        padding: 5px 10px;
+    }
+    
+    /* 侧边面板 - 移动端改为纵向排列并居中 */
+    .side-panels {
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        gap: 10px;
+        margin-top: 15px;
+        position: static;
+        max-height: none;
+    }
+    
+    .side-panel {
+        width: 100%;
+        max-width: 400px;
+    }
+    
+    /* 答题卡样式 - 显示由JS控制 */
+    #question-nav-panel {
+        order: -1; /* 让答题卡在最前面显示 */
+    }
+    
+    /* 答题卡折叠状态 - 内容完全隐藏 */
+    #question-nav-panel.collapsed .panel-content {
+        display: none !important;
+        max-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        opacity: 0 !important;
+        overflow: hidden !important;
+    }
+    
+    /* 答题卡展开状态（默认，非collapsed） */
+    #question-nav-panel:not(.collapsed) .panel-content {
+        display: block !important;
+        max-height: 250px !important;
+        opacity: 1 !important;
+        overflow-y: auto !important;
+        padding: 10px !important;
+    }
+    
+    /* 答题卡内容区默认样式 */
+    #question-nav-panel .panel-content {
+        max-height: 250px;
+        overflow-y: auto;
+    }
+    
+    /* 折叠面板样式优化 */
+    .collapsible-panel .panel-header {
+        padding: 12px 15px;
+    }
+    
+    .collapsible-panel .panel-content {
+        padding: 10px;
+    }
+    
+    /* 排行榜列表优化 */
+    .ranking-item {
+        padding: 10px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .ranking-info {
+        width: 100%;
+    }
+    
+    /* 进度列表优化 */
+    .progress-item {
+        padding: 10px;
+    }
+    
+    /* 答题卡在移动端优化 */
+    .question-nav-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        justify-content: center;
+    }
+    
+    .nav-btn {
+        width: 30px;
+        height: 30px;
+        font-size: 11px;
+    }
+    
+    /* 确保答题卡面板显示 */
+    #question-nav-panel .panel-content {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+}
+
+/* ==================== 小屏幕手机 (小于480px) ==================== */
+@media screen and (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stat-card {
+        flex-direction: row;
+        text-align: left;
+    }
+    
+    .modal-content {
+        width: 100%;
+        margin: 0;
+        border-radius: 0;
+        min-height: 100vh;
+    }
+    
+    /* 答题卡更小屏幕优化 - 一行7个 */
+    .nav-btn {
+        width: 30px;
+        height: 30px;
+        font-size: 11px;
+    }
+}
