@@ -1,4 +1,5 @@
 {
   "appId": "com.dhu.redlesson",
-  "appName": "RedLesson"
+  "appName": "RedLesson",
+  "webDir": "frontend"
 }
