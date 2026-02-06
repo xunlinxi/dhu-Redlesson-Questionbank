@@ -277,10 +277,104 @@ class QuestionParser {
     readFileAsText(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = e => resolve(e.target.result);
+            reader.onload = e => {
+                const arrayBuffer = e.target.result;
+                // 自动检测编码并转换为文本
+                try {
+                    const text = this.detectEncodingAndDecode(arrayBuffer);
+                    resolve(text);
+                } catch (error) {
+                    reject(error);
+                }
+            };
             reader.onerror = reject;
-            reader.readAsText(file, 'UTF-8');
+            reader.readAsArrayBuffer(file);
         });
+    }
+
+    /**
+     * 检测文件编码并解码
+     * 优先尝试 UTF-8 -> GBK -> GB2312
+     */
+    detectEncodingAndDecode(arrayBuffer) {
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        // 1. 检查 BOM (Byte Order Mark)
+        if (uint8Array.length >= 3 && uint8Array[0] === 0xEF && uint8Array[1] === 0xBB && uint8Array[2] === 0xBF) {
+            console.log('检测到 UTF-8 BOM，使用 UTF-8 解码');
+            return this.decodeWithEncoding(uint8Array.slice(3), 'utf-8');
+        }
+
+        // 2. 尝试 UTF-8 解码并验证
+        const utf8Text = this.decodeWithEncoding(uint8Array, 'utf-8');
+        if (this.isValidText(utf8Text)) {
+            console.log('使用 UTF-8 解码成功');
+            return utf8Text;
+        }
+
+        // 3. 尝试 GBK 解码
+        try {
+            const gbkText = this.decodeWithEncoding(uint8Array, 'gbk');
+            if (this.isValidText(gbkText)) {
+                console.log('使用 GBK 解码成功');
+                return gbkText;
+            }
+        } catch (e) {
+            console.warn('GBK 解码失败:', e);
+        }
+
+        // 4. 尝试 GB2312 解码
+        try {
+            const gb2312Text = this.decodeWithEncoding(uint8Array, 'gb2312');
+            if (this.isValidText(gb2312Text)) {
+                console.log('使用 GB2312 解码成功');
+                return gb2312Text;
+            }
+        } catch (e) {
+            console.warn('GB2312 解码失败:', e);
+        }
+
+        // 5. 如果都失败，返回 UTF-8 结果（可能包含乱码，但至少能显示）
+        console.warn('所有编码尝试失败，使用 UTF-8 作为后备');
+        return utf8Text;
+    }
+
+    /**
+     * 使用指定编码解码字节数组
+     */
+    decodeWithEncoding(uint8Array, encoding) {
+        // 使用 TextDecoder API（支持主流浏览器和 Android WebView）
+        const decoder = new TextDecoder(encoding, { fatal: false });
+        return decoder.decode(uint8Array);
+    }
+
+    /**
+     * 验证文本是否有效（检查是否包含大量乱码字符）
+     */
+    isValidText(text) {
+        if (!text || text.length === 0) return false;
+
+        // 检查是否包含常见的中文字符、标点等
+        const chineseCharPattern = /[\u4e00-\u9fa5]/;
+        const validPattern = /[\u4e00-\u9fa5a-zA-Z0-9\s\.\,\?\(\)\[\]《》【】、。，：？！]/;
+
+        // 统计有效字符比例
+        let validChars = 0;
+        let chineseChars = 0;
+
+        for (let i = 0; i < Math.min(text.length, 1000); i++) {
+            const char = text[i];
+            if (chineseCharPattern.test(char)) {
+                chineseChars++;
+                validChars++;
+            } else if (validPattern.test(char)) {
+                validChars++;
+            }
+        }
+
+        // 如果中文字符超过 5 个，且有效字符比例超过 50%，认为有效
+        const validRatio = validChars / Math.min(text.length, 1000);
+        return chineseChars >= 5 && validRatio > 0.5;
     }
 }
 
