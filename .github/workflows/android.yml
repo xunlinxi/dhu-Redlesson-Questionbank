@@ -84,10 +84,12 @@ jobs:
 
     - name: Rename APK
       run: |
-        # 从 git tag 或 ref 获取版本号
-        VERSION=${GITHUB_REF#refs/tags/v}
-        if [ -z "$VERSION" ]; then
-          VERSION="dev"
+        # 从 git tag 获取版本号（只有 tag 才带 v 前缀）
+        if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+        else
+          # 使用构建 ID 作为版本标识
+          VERSION="build-${GITHUB_RUN_ID}"
         fi
         # 重命名 APK
         mv platforms/android/android/app/build/outputs/apk/debug/app-debug.apk platforms/android/android/app/build/outputs/apk/debug/RedLesson_${VERSION}.apk
