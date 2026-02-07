@@ -103,10 +103,11 @@ jobs:
         path: platforms/android/android/app/build/outputs/apk/debug/RedLesson_*.apk
 
     - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'xunlinxi/dhu-Redlesson-Questionbank'
+      if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
         files: platforms/android/android/app/build/outputs/apk/debug/RedLesson_*.apk
         generate_release_notes: false
+        fail_on_unmatched_files: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
