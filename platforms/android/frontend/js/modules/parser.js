@@ -116,8 +116,33 @@ class QuestionParser {
                 // 尝试解析选项
                 const optionParsed = this.parseOptionLine(line, currentQuestion);
                 if (optionParsed) continue;
+
+                // 检查是否是答案相关行（不能追加到选项）
+                // 情况1：纯答案行，如 "(A)"、"（ABCD）"
+                const pureAnswerMatch = line.match(/^[（(]\s*[A-Za-zＡ-Ｚａ-ｚ]+\s*[）)]$/);
+                // 情况2：答案标记行，如 "答案：A"、"答案：ABCD"
+                const answerPrefixMatch = line.match(/^答案[：:]\s*([A-Za-zＡ-Ｚａ-ｚ]+)\s*$/i);
+                // 情况3：问号+答案，如 "?A"、"？ABCD"
+                const questionAnswerMatch = line.match(/^[？？]\s*([A-Za-zＡ-Ｚａ-ｚ]+)\s*$/);
+
+                if (pureAnswerMatch || answerPrefixMatch || questionAnswerMatch) {
+                    // 提取答案
+                    let answerText = line;
+                    if (answerPrefixMatch) {
+                        answerText = answerPrefixMatch[1];
+                    } else if (questionAnswerMatch) {
+                        answerText = questionAnswerMatch[1];
+                    } else {
+                        // 纯括号答案，提取括号内容
+                        const match = line.match(/[（(]\s*([A-Za-zＡ-Ｚａ-ｚ]+)\s*[）)]/);
+                        if (match) answerText = match[1];
+                    }
+                    const rawAnswer = answerText.replace(/[\s\?？]/g, '');
+                    currentQuestion.answer = rawAnswer.split('').map(c => this.normalizeOptionLetter(c));
+                    continue; // 跳过后续处理，不追加到选项
+                }
             }
-            
+
             // 5. 题目或选项内容的延续
             if (currentQuestion) {
                  // 如果还没有任何选项，则追加到题目内容
