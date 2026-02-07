@@ -82,8 +82,19 @@ jobs:
         chmod +x gradlew
         ./gradlew assembleDebug
 
+    - name: Rename APK
+      run: |
+        # 从 git tag 或 ref 获取版本号
+        VERSION=${GITHUB_REF#refs/tags/v}
+        if [ -z "$VERSION" ]; then
+          VERSION="dev"
+        fi
+        # 重命名 APK
+        mv platforms/android/android/app/build/outputs/apk/debug/app-debug.apk platforms/android/android/app/build/outputs/apk/debug/RedLesson_${VERSION}.apk
+        echo "APK 重命名为: RedLesson_${VERSION}.apk"
+
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: app-debug.apk
-        path: platforms/android/android/app/build/outputs/apk/debug/app-debug.apk
+        name: RedLesson.apk
+        path: platforms/android/android/app/build/outputs/apk/debug/RedLesson_*.apk
