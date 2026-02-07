@@ -43,7 +43,7 @@ jobs:
         path: platforms/electron/dist/*.exe
 
     - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/v')
+      if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'xunlinxi/dhu-Redlesson-Questionbank'
       uses: softprops/action-gh-release@v2
       with:
         files: platforms/electron/dist/*.exe
