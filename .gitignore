@@ -86,6 +86,9 @@ platforms/android/node_modules/
 platforms/android/.gradle/
 platforms/android/android/app/build/
 platforms/android/android/build/
+# Android APK 和编译产物
+platforms/android/app/
+platforms/android/android/app/release/
 
 # Web
 platforms/web/.venv/
