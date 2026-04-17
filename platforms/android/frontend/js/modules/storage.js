@@ -599,6 +599,48 @@ class StorageService {
 
     // ================== 辅助函数 ==================
 
+    async clearAllCacheData() {
+        try {
+            if (this.isElectron) {
+                await window.electronAPI.clearRankings();
+            } else if (this.isMobile) {
+                await Promise.all([
+                    this.db.rankings.clear(),
+                    this.db.wrongbook.clear(),
+                    this.db.progress.clear()
+                ]);
+            } else {
+                await Promise.all([
+                    fetch('/api/rankings', { method: 'DELETE' }),
+                    fetch('/api/wrongbook', { method: 'DELETE' })
+                ]);
+                const progressData = await this.getProgressList();
+                if (progressData.success && progressData.progress_list) {
+                    await Promise.all(
+                        progressData.progress_list.map(p => this.deleteProgress(p.id))
+                    );
+                }
+            }
+            return { success: true };
+        } catch (e) {
+            return { success: false, error: e.message };
+        }
+    }
+
+    async getProgressList() {
+        if (this.isElectron) {
+            return await window.electronAPI.getProgress();
+        } else if (this.isMobile) {
+            try {
+                const list = await this.db.progress.toArray();
+                return { success: true, progress_list: list };
+            } catch (e) { return { success: false, error: e.message }; }
+        } else {
+            const response = await fetch('/api/progress');
+            return await response.json();
+        }
+    }
+
     shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));

@@ -32,6 +32,11 @@ function onPracticeModeChange() {
     } else {
         updateAvailableStats();
     }
+
+    var statsTitle = document.querySelector('#stats-preview h3');
+    if (statsTitle) {
+        statsTitle.textContent = mode === 'wrong' ? '错题统计' : '题库统计';
+    }
 }
 
 // 更新错题数量统计
@@ -48,11 +53,13 @@ async function updateWrongQuestionStats() {
             let singleCount = 0;
             let multiCount = 0;
             
-            if (bank && data.stats[bank]) {
-                singleCount = data.stats[bank].single || 0;
-                multiCount = data.stats[bank].multi || 0;
+            if (bank) {
+                const bankStats = data.stats[bank];
+                if (bankStats) {
+                    singleCount = bankStats.single || 0;
+                    multiCount = bankStats.multi || 0;
+                }
             } else {
-                // 所有题库的错题
                 Object.values(data.stats).forEach(stat => {
                     singleCount += stat.single || 0;
                     multiCount += stat.multi || 0;

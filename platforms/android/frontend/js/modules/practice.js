@@ -23,11 +23,19 @@ async function loadPracticeOptions() {
         // 绑定题库选择事件
         select.onchange = () => {
             loadPracticeChapters();
-            updateAvailableStats();
+            if (currentPracticeMode === 'wrong') {
+                updateWrongQuestionStats();
+            } else {
+                updateAvailableStats();
+            }
         };
         
         // 初始加载统计
-        updateAvailableStats();
+        if (currentPracticeMode === 'wrong') {
+            updateWrongQuestionStats();
+        } else {
+            updateAvailableStats();
+        }
     } catch (error) {
         console.error('加载题库选项失败:', error);
     }
@@ -57,7 +65,13 @@ async function loadPracticeChapters() {
         }
     }
     
-    select.onchange = updateAvailableStats;
+    select.onchange = function() {
+        if (currentPracticeMode === 'wrong') {
+            updateWrongQuestionStats();
+        } else {
+            updateAvailableStats();
+        }
+    };
 }
 
 // 更新可用题目统计

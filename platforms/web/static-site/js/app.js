@@ -695,11 +695,19 @@ async function loadPracticeOptions() {
         // 绑定题库选择事件
         select.onchange = () => {
             loadPracticeChapters();
-            updateAvailableStats();
+            if (currentPracticeMode === 'wrong') {
+                updateWrongQuestionStats();
+            } else {
+                updateAvailableStats();
+            }
         };
         
         // 初始加载统计
-        updateAvailableStats();
+        if (currentPracticeMode === 'wrong') {
+            updateWrongQuestionStats();
+        } else {
+            updateAvailableStats();
+        }
     } catch (error) {
         console.error('加载题库选项失败:', error);
     }
@@ -725,7 +733,13 @@ async function loadPracticeChapters() {
         }
     }
     
-    select.onchange = updateAvailableStats;
+    select.onchange = function() {
+        if (currentPracticeMode === 'wrong') {
+            updateWrongQuestionStats();
+        } else {
+            updateAvailableStats();
+        }
+    };
 }
 
 async function updateAvailableStats() {
@@ -1620,7 +1634,6 @@ function clearAllData() {
         '确定要清空所有题库数据吗？该操作不可恢复！',
         async () => {
             try {
-                // 获取所有题库并删除
                 const response = await fetch(`${API_BASE}/api/banks`);
                 const data = await response.json();
                 
@@ -1636,6 +1649,36 @@ function clearAllData() {
             } catch (error) {
                 showToast('清空数据失败: ' + error.message, 'error');
             }
+        }
+    );
+}
+
+function confirmClearCache() {
+    showConfirmModal(
+        '清空本地缓存',
+        '此操作将清空排行榜、错题本、做题进度等本地缓存数据，题库内容不会被删除。是否继续？',
+        () => {
+            showConfirmModal(
+                '二次确认',
+                '确定要清空所有本地缓存吗？此操作不可恢复！',
+                async () => {
+                    try {
+                        localStorage.removeItem('quiz_rankings');
+                        localStorage.removeItem('quiz_wrongbook');
+                        localStorage.removeItem('quiz_progress');
+                        localStorage.removeItem('quiz_player_name');
+                        localStorage.removeItem('mobileMenuBtnPos');
+                        if (typeof Wrongbook !== 'undefined') Wrongbook.clear();
+                        if (typeof Rankings !== 'undefined') Rankings.clear();
+                        if (typeof Progress !== 'undefined') Progress.clearAll();
+                        showToast('本地缓存已清空', 'success');
+                        loadStats();
+                        loadBankChapters();
+                    } catch (error) {
+                        showToast('清空缓存失败: ' + error.message, 'error');
+                    }
+                }
+            );
         }
     );
 }
@@ -1817,6 +1860,11 @@ function onPracticeModeChange() {
     } else {
         updateAvailableStats();
     }
+
+    var statsTitle = document.querySelector('#stats-preview h3');
+    if (statsTitle) {
+        statsTitle.textContent = mode === 'wrong' ? '错题统计' : '题库统计';
+    }
 }
 
 // 更新错题数量统计
@@ -1832,11 +1880,13 @@ async function updateWrongQuestionStats() {
             let singleCount = 0;
             let multiCount = 0;
             
-            if (bank && data.stats[bank]) {
-                singleCount = data.stats[bank].single || 0;
-                multiCount = data.stats[bank].multi || 0;
+            if (bank) {
+                const bankStats = data.stats[bank];
+                if (bankStats) {
+                    singleCount = bankStats.single || 0;
+                    multiCount = bankStats.multi || 0;
+                }
             } else {
-                // 所有题库的错题
                 Object.values(data.stats).forEach(stat => {
                     singleCount += stat.single || 0;
                     multiCount += stat.multi || 0;
