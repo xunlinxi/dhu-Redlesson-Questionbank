@@ -1668,7 +1668,7 @@ function confirmClearCache() {
                         localStorage.removeItem('quiz_progress');
                         localStorage.removeItem('quiz_player_name');
                         localStorage.removeItem('mobileMenuBtnPos');
-                        if (typeof Wrongbook !== 'undefined') Wrongbook.clear();
+                        if (typeof Wrongbook !== 'undefined') Wrongbook.clearAll();
                         if (typeof Rankings !== 'undefined') Rankings.clear();
                         if (typeof Progress !== 'undefined') Progress.clearAll();
                         showToast('本地缓存已清空', 'success');
