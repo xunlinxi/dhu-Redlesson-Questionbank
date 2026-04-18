@@ -201,31 +201,12 @@ function handleDragEnd(e) {
 }
 
 function toggleMenu() {
-    var sidebar = document.querySelector('.sidebar');
     var btn = document.querySelector('.mobile-menu-btn');
-    var overlay = document.querySelector('.sidebar-overlay');
     
     mobileMenuOpen = !mobileMenuOpen;
     
-    if (mobileMenuOpen) {
-        sidebar.className += ' open';
-        btn.className += ' active';
-        btn.innerHTML = '<i class="fas fa-times"></i>';
-        
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.className = 'sidebar-overlay active';
-            overlay.onclick = closeMenu;
-            document.body.appendChild(overlay);
-        }
-    } else {
-        sidebar.className = sidebar.className.replace(' open', '');
-        btn.className = btn.className.replace(' active', '');
-        btn.innerHTML = '<i class="fas fa-bars"></i>';
-        
-        if (overlay && overlay.parentNode) {
-            overlay.parentNode.removeChild(overlay);
-        }
+    if (typeof toggleMobileNav === 'function') {
+        toggleMobileNav();
     }
 }
 

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_レイヤー_1" data-name="レイヤー_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 80 79">
+  <!-- Generator: Adobe Illustrator 29.8.2, SVG Export Plug-In . SVG Version: 2.1.1 Build 3)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #fff;
+        fill-rule: evenodd;
+      }
+    </style>
+  </defs>
+  <path id="character_arrow.svg" class="st0" d="M0,40c21.54,0,39,17.46,39,39h1c0-18.67-12.93-34.86-31.14-39h71.14v-1H8.86C27.07,34.86,40,18.67,40,0h-1c0,21.54-17.46,39-39,39h0v1h0Z"/>
+</svg>

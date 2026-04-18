@@ -46,13 +46,34 @@ function initMobile() {
     }
 }
 
-// 检测是否为本地客户端（静态版本始终为远程模式）
+// 检测是否为本地客户端
 function checkClientType() {
-    // 静态版本始终设置为远程模式，使用本地存储
-    isLocalClient = false;
-    document.body.className += ' remote-mode';
-    showRemoteBadge();
-    setupLocalStorage();
+    // Electron 环境始终是本地客户端
+    if (window.electronAPI !== undefined) {
+        isLocalClient = true;
+        return;
+    }
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/client/info', true);
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+            try {
+                var data = JSON.parse(xhr.responseText);
+                if (data.success) {
+                    isLocalClient = data.is_local;
+                    if (!isLocalClient) {
+                        document.body.className += ' remote-mode';
+                        showRemoteBadge();
+                        setupLocalStorage();
+                    }
+                }
+            } catch (e) {
+                console.error('解析客户端信息失败', e);
+            }
+        }
+    };
+    xhr.send();
 }
 
 // 显示远程模式标识
@@ -180,31 +201,12 @@ function handleDragEnd(e) {
 }
 
 function toggleMenu() {
-    var sidebar = document.querySelector('.sidebar');
     var btn = document.querySelector('.mobile-menu-btn');
-    var overlay = document.querySelector('.sidebar-overlay');
     
     mobileMenuOpen = !mobileMenuOpen;
     
-    if (mobileMenuOpen) {
-        sidebar.className += ' open';
-        btn.className += ' active';
-        btn.innerHTML = '<i class="fas fa-times"></i>';
-        
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.className = 'sidebar-overlay active';
-            overlay.onclick = closeMenu;
-            document.body.appendChild(overlay);
-        }
-    } else {
-        sidebar.className = sidebar.className.replace(' open', '');
-        btn.className = btn.className.replace(' active', '');
-        btn.innerHTML = '<i class="fas fa-bars"></i>';
-        
-        if (overlay && overlay.parentNode) {
-            overlay.parentNode.removeChild(overlay);
-        }
+    if (typeof toggleMobileNav === 'function') {
+        toggleMobileNav();
     }
 }
 

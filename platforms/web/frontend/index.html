@@ -4,115 +4,253 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>题库刷题系统</title>
+    <title>炸红题库</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Inter:wght@300;400;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/mobile.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
 <body>
-    <div class="app-container">
-        <!-- 侧边栏导航 -->
-        <nav class="sidebar">
-            <div class="logo">
-                <i class="fas fa-book-open"></i>
-                <span>炸红题库刷题系统</span>
-            </div>
-            <ul class="nav-menu">
-                <li class="nav-item active" data-page="dashboard">
-                    <i class="fas fa-home"></i>
-                    <span>首页</span>
-                </li>
-                <li class="nav-item" data-page="import">
-                    <i class="fas fa-upload"></i>
-                    <span>导入题库</span>
-                </li>
-                <li class="nav-item" data-page="manage">
-                    <i class="fas fa-database"></i>
-                    <span>题库管理</span>
-                </li>
-                <li class="nav-item" data-page="wrongbook">
-                    <i class="fas fa-times-circle"></i>
-                    <span>错题本</span>
-                </li>
-                <li class="nav-item" data-page="practice">
-                    <i class="fas fa-pen"></i>
-                    <span>开始刷题</span>
-                </li>
-            </ul>
-        </nav>
+    <div class="page-loader" id="pageLoader">
+        <div class="loader-content">
+            <div class="loader-icon"><i class="fas fa-book-open"></i></div>
+            <div class="loader-text">LOADING</div>
+            <div class="loader-bar"><div class="loader-bar-fill"></div></div>
+        </div>
+    </div>
 
-        <!-- 主内容区 -->
-        <main class="main-content">
-            <!-- 首页 -->
-            <div id="dashboard-page" class="page active">
-                <h1>欢迎使用炸红题库系统</h1>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="fas fa-database"></i></div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="total-banks">0</span>
-                            <span class="stat-label">题库数量</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="total-questions">0</span>
-                            <span class="stat-label">题目总数</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="single-count">0</span>
-                            <span class="stat-label">单选题</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="fas fa-list"></i></div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="multi-count">0</span>
-                            <span class="stat-label">多选题</span>
-                        </div>
-                    </div>
+    <div class="particles-bg" id="particlesBg"></div>
+    <div class="aurora-bg">
+        <div class="aurora-layer aurora-layer-1"></div>
+        <div class="aurora-layer aurora-layer-2"></div>
+        <div class="aurora-layer aurora-layer-3"></div>
+        <div class="aurora-layer aurora-layer-4"></div>
+        <div class="aurora-layer aurora-layer-5"></div>
+    </div>
+    <div class="mouse-glow" id="mouseGlow"></div>
+    <div class="deco-circle deco-circle-1"></div>
+    <div class="deco-circle deco-circle-2"></div>
+    <div class="deco-circle deco-circle-3"></div>
+    <div class="deco-ring deco-ring-1"></div>
+    <div class="deco-ring deco-ring-2"></div>
+    <div class="deco-star deco-star-1"></div>
+    <div class="deco-star deco-star-2"></div>
+    <div class="deco-star deco-star-3"></div>
+    <div class="deco-diamond deco-diamond-1"></div>
+    <div class="deco-diamond deco-diamond-2"></div>
+    <div class="deco-diamond deco-diamond-3"></div>
+    <div class="neon-line neon-line-1"></div>
+    <div class="neon-line neon-line-2"></div>
+    <img class="deco-neon deco-neon-octopus" src="img/deco/deco_neon-octopus.png" alt="">
+    <img class="deco-neon deco-neon-fish" src="img/deco/deco_neon-fish.png" alt="">
+    <img class="deco-neon deco-neon-cloud1" src="img/deco/deco_neon-cloud1.png" alt="">
+    <img class="deco-neon deco-neon-cloud2" src="img/deco/deco_neon-cloud2.png" alt="">
+    <img class="deco-neon deco-cloud1" src="img/deco/deco_cloud.png" alt="">
+    <img class="deco-neon deco-cloud2" src="img/deco/deco_cloud.png" alt="">
+
+    <div class="app-wrapper">
+        <header class="top-nav" id="topNav">
+            <div class="nav-inner">
+                <div class="nav-brand float-animation" onclick="switchPage('dashboard')">
+                    <i class="fas fa-book-open"></i>
+                    <span>炸红题库</span>
                 </div>
+                <nav class="nav-links">
+                    <a class="nav-link active" data-page="dashboard">
+                        <i class="fas fa-home"></i><span>首页</span>
+                    </a>
+                    <a class="nav-link" data-page="import">
+                        <i class="fas fa-upload"></i><span>导入</span>
+                    </a>
+                    <a class="nav-link" data-page="manage">
+                        <i class="fas fa-database"></i><span>题库</span>
+                    </a>
+                    <a class="nav-link" data-page="wrongbook">
+                        <i class="fas fa-times-circle"></i><span>错题本</span>
+                    </a>
+                    <a class="nav-link" data-page="practice">
+                        <i class="fas fa-pen"></i><span>刷题</span>
+                    </a>
+                </nav>
+            </div>
+        </header>
 
-                <div class="quick-actions">
-                    <h2>快速开始</h2>
-                    <div class="action-buttons">
-                        <button class="btn btn-primary import-btn" onclick="switchPage('import')">
+        <main class="main-content">
+            <div id="dashboard-page" class="page active">
+                <section class="hero-section">
+                    <div class="hero-badge">ONLINE STUDY PLATFORM</div>
+                    <div class="hero-visual">
+                        <div class="hero-visual-glow"></div>
+                        <div class="hero-visual-ring-outer"></div>
+                        <div class="hero-visual-ring"></div>
+                        <div class="hero-visual-icon"><i class="fas fa-book-open"></i></div>
+                    </div>
+                    <h1 class="hero-title gradient-text-flow">炸红题库</h1>
+                    <p class="hero-subtitle">政治理论课程智能刷题系统 — 习概 / 毛概 / 思修 / 近代史</p>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary btn-giant" onclick="switchPage('practice')">
+                            <i class="fas fa-play"></i> 开始刷题
+                        </button>
+                        <button class="btn btn-glass" onclick="switchPage('import')">
                             <i class="fas fa-upload"></i> 导入题库
                         </button>
-                        <button class="btn btn-success" onclick="switchPage('practice')">
-                            <i class="fas fa-pen"></i> 开始刷题
-                        </button>
-                        <button class="btn btn-danger" onclick="confirmClearCache()">
-                            <i class="fas fa-broom"></i> 清空缓存
+                    </div>
+                    <div class="hero-secondary-actions">
+                        <button class="btn btn-danger-solid btn-sm" onclick="confirmClearCache()">
+                            <img src="img/deco/character_changebtn.svg" style="width:16px;height:16px;animation:refreshSpin 3s linear infinite;vertical-align:middle;margin-right:4px"> 清空缓存
                         </button>
                     </div>
-                </div>
+                </section>
 
-                <div class="chapter-stats" id="chapter-stats">
-                    <h2>题库概览</h2>
-                    <div class="bank-chapters-container" id="bank-chapters-container">
-                        <!-- 按题库分类的章节将由JS动态生成 -->
+                <section class="stats-strip stagger-in">
+                    <div class="stat-pill glow-card">
+                        <div class="stat-icon-sm"><i class="fas fa-database"></i></div>
+                        <div class="stat-num" id="total-banks">0</div>
+                        <div class="stat-tag">题库</div>
                     </div>
-                </div>
+                    <div class="stat-pill glow-card">
+                        <div class="stat-icon-sm accent"><i class="fas fa-question-circle"></i></div>
+                        <div class="stat-num" id="total-questions">0</div>
+                        <div class="stat-tag">题目</div>
+                    </div>
+                    <div class="stat-pill glow-card">
+                        <div class="stat-icon-sm green"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-num" id="single-count">0</div>
+                        <div class="stat-tag">单选</div>
+                    </div>
+                    <div class="stat-pill glow-card">
+                        <div class="stat-icon-sm orange"><i class="fas fa-list"></i></div>
+                        <div class="stat-num" id="multi-count">0</div>
+                        <div class="stat-tag">多选</div>
+                    </div>
+                </section>
+
+                <section class="bento-grid scroll-reveal">
+                    <div class="bento-card bento-wide shimmer" onclick="switchPage('practice')" style="cursor:pointer">
+                        <div class="bento-icon"><i class="fas fa-pen"></i></div>
+                        <h3>开始练习</h3>
+                        <p>选择题库和模式，开始答题</p>
+                    </div>
+                    <div class="bento-card" onclick="switchPage('import')" style="cursor:pointer">
+                        <div class="bento-icon accent"><i class="fas fa-upload"></i></div>
+                        <h3>导入题库</h3>
+                        <p>上传 TXT/DOC 文件</p>
+                    </div>
+                </section>
+
+                <section class="bento-grid bento-grid-two scroll-reveal" data-reveal-delay="100">
+                    <div class="bento-card deco-corner-frame" id="chapter-stats">
+                        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+                        <div class="bento-icon green"><i class="fas fa-layer-group"></i></div>
+                        <h3>题库概览</h3>
+                        <div class="bank-chapters-container" id="bank-chapters-container"></div>
+                    </div>
+                    <div class="bento-card" onclick="switchPage('wrongbook')" style="cursor:pointer">
+                        <div class="bento-icon red"><i class="fas fa-times-circle"></i></div>
+                        <h3>错题本</h3>
+                        <div class="wrongbook-mini-overview" id="wrongbook-mini-overview">
+                            <div class="wm-row">
+                                <span class="wm-row-icon"><i class="fas fa-exclamation-circle"></i></span>
+                                <span class="wm-row-num" id="wb-total">0</span>
+                                <span class="wm-row-label">道错题</span>
+                            </div>
+                            <div class="wm-row">
+                                <span class="wm-row-icon"><i class="fas fa-book"></i></span>
+                                <span class="wm-row-num" id="wb-banks">0</span>
+                                <span class="wm-row-label">个题库</span>
+                            </div>
+                            <div class="wm-row">
+                                <span class="wm-row-icon"><i class="fas fa-check-circle"></i></span>
+                                <span class="wm-row-num" id="wb-reviewed">0</span>
+                                <span class="wm-row-label">已复习</span>
+                            </div>
+                        </div>
+                        <p class="wrongbook-hint desktop-only">点击查看全部错题 →</p>
+                    </div>
+                </section>
+
+                <section class="section-deco-title scroll-reveal" data-reveal-delay="200">
+                    <div class="deco-wave-wrap">
+                        <svg viewBox="0 0 200 12" fill="none" preserveAspectRatio="none">
+                            <path d="M0 6 C20 2 40 10 60 6 C80 2 100 10 120 6 C140 2 160 10 180 6 L200 6" stroke="#00c0c3" stroke-width="1" opacity="0.3"/>
+                        </svg>
+                    </div>
+                    <img class="deco-coin" src="img/deco/title_coin.png" alt="">
+                    <span class="neon-text">FEATURES</span>
+                    <span class="deco-title-sub">功能特色</span>
+                    <img class="deco-coin" src="img/deco/title_coin.png" alt="">
+                    <div class="deco-wave-wrap">
+                        <svg viewBox="0 0 200 12" fill="none" preserveAspectRatio="none">
+                            <path d="M0 6 C20 10 40 2 60 6 C80 10 100 2 120 6 C140 10 160 2 180 6 L200 6" stroke="#ff635d" stroke-width="1" opacity="0.3"/>
+                        </svg>
+                    </div>
+                </section>
+                <section class="features-carousel scroll-reveal" data-reveal-delay="300">
+                    <div class="swiper features-swiper">
+                        <div class="swiper-wrapper">
+                            <div class="swiper-slide">
+                                <div class="feature-card" data-color="cyan">
+                                    <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+                                    <h4>智能刷题</h4>
+                                    <p>支持随机、顺序、考试、错题四种模式</p>
+                                </div>
+                            </div>
+                            <div class="swiper-slide">
+                                <div class="feature-card" data-color="orange">
+                                    <div class="feature-icon"><i class="fas fa-file-import"></i></div>
+                                    <h4>多格式导入</h4>
+                                    <p>支持 TXT、DOC、DOCX 格式题库文件</p>
+                                </div>
+                            </div>
+                            <div class="swiper-slide">
+                                <div class="feature-card" data-color="green">
+                                    <div class="feature-icon"><i class="fas fa-chart-bar"></i></div>
+                                    <h4>成绩统计</h4>
+                                    <p>实时记录正确率和用时，排行榜激励</p>
+                                </div>
+                            </div>
+                            <div class="swiper-slide">
+                                <div class="feature-card" data-color="salmon">
+                                    <div class="feature-icon"><i class="fas fa-save"></i></div>
+                                    <h4>进度保存</h4>
+                                    <p>随时保存做题进度，下次继续练习</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="features-swiper-nav">
+                        <button class="carousel-btn prev" id="featurePrev"><img src="img/deco/character_arrow.svg" alt=""></button>
+                        <button class="carousel-btn next" id="featureNext"><img src="img/deco/character_arrow.svg" alt=""></button>
+                    </div>
+                    <div class="swiper-pagination features-pagination" id="featuresPagination"></div>
+                    <div class="features-umbrellas">
+                        <img class="umbrella-item" src="img/deco/deco_umbrella1.svg" alt="">
+                        <img class="umbrella-item" src="img/deco/deco_umbrella2.svg" alt="">
+                        <img class="umbrella-item" src="img/deco/deco_umbrella3.svg" alt="">
+                        <img class="umbrella-item" src="img/deco/deco_umbrella4.svg" alt="">
+                    </div>
+                </section>
+
             </div>
 
-            <!-- 导入题库页 -->
             <div id="import-page" class="page">
-                <h1>导入题库</h1>
-                <div class="import-section">
+                <div class="section-header">
+                    <button class="btn btn-ghost" onclick="switchPage('dashboard')">
+                        <i class="fas fa-arrow-left"></i> 首页
+                    </button>
+                    <h1>导入题库</h1>
+                </div>
+                <div class="import-section import-section-centered">
                     <div class="upload-area" id="upload-area">
                         <i class="fas fa-cloud-upload-alt"></i>
                         <p>拖拽文件到此处或点击上传</p>
-                        <p class="hint">支持 .txt、.doc、.docx 格式<br><small>推荐使用TXT格式避免Word自动编号问题；doc/docx会自动转换为文本处理</small>
-                        </p>
+                        <p class="hint">支持 .txt、.doc、.docx 格式<br><small>推荐使用TXT格式避免Word自动编号问题</small></p>
                         <input type="file" id="file-input" accept=".txt,.doc,.docx" hidden>
                     </div>
-
                     <div class="import-form">
                         <div class="form-group">
                             <label for="bank-name">题库名称（可选）</label>
@@ -121,34 +259,29 @@
                         <div class="selected-file" id="selected-file" style="display: none;">
                             <i class="fas fa-file-alt"></i>
                             <span id="file-name"></span>
-                            <button class="btn-icon" onclick="clearFile()">
-                                <i class="fas fa-times"></i>
-                            </button>
+                            <button class="btn-icon" onclick="clearFile()"><i class="fas fa-times"></i></button>
                         </div>
                         <button class="btn btn-primary btn-block" id="import-btn" onclick="importFile()" disabled>
                             <i class="fas fa-upload"></i> 开始导入
                         </button>
                     </div>
-
                     <div class="import-progress" id="import-progress" style="display: none;">
-                        <div class="progress-bar">
-                            <div class="progress-fill"></div>
-                        </div>
+                        <div class="progress-bar"><div class="progress-fill"></div></div>
                         <p class="progress-text">正在导入...</p>
                     </div>
-
                     <div class="import-result" id="import-result" style="display: none;"></div>
                 </div>
             </div>
 
-            <!-- 题库管理页 -->
             <div id="manage-page" class="page">
-                <h1>题库管理</h1>
+                <div class="section-header">
+                    <button class="btn btn-ghost" onclick="switchPage('dashboard')">
+                        <i class="fas fa-arrow-left"></i> 首页
+                    </button>
+                    <h1>题库管理</h1>
+                </div>
                 <div class="manage-section">
-                    <div class="bank-list" id="bank-list">
-                        <!-- 题库列表将通过JS动态生成 -->
-                    </div>
-
+                    <div class="bank-list" id="bank-list"></div>
                     <div class="question-browser" id="question-browser" style="display: none;">
                         <div class="browser-header">
                             <button class="btn btn-secondary" onclick="showBankList()">
@@ -175,14 +308,15 @@
                 </div>
             </div>
 
-            <!-- 刷题页 -->
             <div id="practice-page" class="page">
-                <div class="practice-page-header">
+                <div class="section-header">
+                    <button class="btn btn-ghost" onclick="switchPage('dashboard')">
+                        <i class="fas fa-arrow-left"></i> 首页
+                    </button>
                     <h1 id="practice-title">刷题练习</h1>
                     <div class="practice-header-info" id="practice-header-info" style="display: none;">
                         <div class="progress-info">
-                            <span>题目进度: <strong id="current-index">1</strong> / <strong
-                                    id="total-count">10</strong></span>
+                            <span>进度: <strong id="current-index">1</strong> / <strong id="total-count">10</strong></span>
                             <span class="practice-mode-badge" id="practice-mode-badge"></span>
                         </div>
                         <div class="timer-display" id="timer-display" style="display: none;">
@@ -190,20 +324,17 @@
                             <span id="timer-text">35:00</span>
                         </div>
                         <div class="score-info" id="score-info">
-                            <span class="correct-count"><i class="fas fa-check"></i> <span
-                                    id="correct-num">0</span></span>
+                            <span class="correct-count"><i class="fas fa-check"></i> <span id="correct-num">0</span></span>
                             <span class="wrong-count"><i class="fas fa-times"></i> <span id="wrong-num">0</span></span>
                         </div>
                         <button class="btn btn-secondary btn-small" onclick="saveCurrentProgress()" title="保存进度">
-                            <i class="fas fa-save"></i> 保存进度
+                            <i class="fas fa-save"></i> 保存
                         </button>
                     </div>
                 </div>
 
                 <div class="practice-layout">
-                    <!-- 左侧：刷题区域 -->
                     <div class="practice-main">
-                        <!-- 刷题设置 -->
                         <div class="practice-settings" id="practice-settings">
                             <div class="settings-row-top">
                                 <div class="settings-card">
@@ -234,23 +365,17 @@
                                     <div class="question-config">
                                         <div class="config-row">
                                             <label>单选题数量</label>
-                                            <input type="number" id="practice-single-count" class="form-control"
-                                                value="30" min="0" max="500">
+                                            <input type="number" id="practice-single-count" class="form-control" value="30" min="0" max="500">
                                         </div>
                                         <div class="config-row">
                                             <label>多选题数量</label>
-                                            <input type="number" id="practice-multi-count" class="form-control"
-                                                value="20" min="0" max="500">
+                                            <input type="number" id="practice-multi-count" class="form-control" value="20" min="0" max="500">
                                         </div>
                                         <div class="config-row">
-                                            <label>
-                                                <input type="checkbox" id="shuffle-options" checked> 随机打乱选项
-                                            </label>
+                                            <label><input type="checkbox" id="shuffle-options" checked> 随机打乱选项</label>
                                         </div>
                                         <div class="config-row" id="shuffle-questions-row" style="display: none;">
-                                            <label>
-                                                <input type="checkbox" id="shuffle-questions"> 打乱题目顺序
-                                            </label>
+                                            <label><input type="checkbox" id="shuffle-questions"> 打乱题目顺序</label>
                                         </div>
                                     </div>
                                 </div>
@@ -258,14 +383,11 @@
                                     <h3>限时设置</h3>
                                     <div class="timer-config">
                                         <div class="config-row">
-                                            <label>
-                                                <input type="checkbox" id="enable-timer" checked> 启用限时
-                                            </label>
+                                            <label><input type="checkbox" id="enable-timer" checked> 启用限时</label>
                                         </div>
                                         <div class="config-row">
                                             <label>答题时间（分钟）</label>
-                                            <input type="number" id="practice-time" class="form-control" value="30"
-                                                min="1" max="180">
+                                            <input type="number" id="practice-time" class="form-control" value="30" min="1" max="180">
                                         </div>
                                     </div>
                                 </div>
@@ -278,19 +400,16 @@
                                 </div>
                                 <div class="settings-card">
                                     <h3>你的名字</h3>
-                                    <input type="text" id="player-name" class="form-control" placeholder="输入名字记录成绩"
-                                        value="匿名">
+                                    <input type="text" id="player-name" class="form-control" placeholder="输入名字记录成绩" value="匿名">
                                 </div>
                             </div>
                             <div class="practice-start-btn">
-                                <button class="btn btn-primary btn-large" id="start-practice-btn"
-                                    onclick="startPracticeByMode()">
+                                <button class="btn btn-primary btn-large" id="start-practice-btn" onclick="startPracticeByMode()">
                                     <i class="fas fa-play"></i> 开始刷题
                                 </button>
                             </div>
                         </div>
 
-                        <!-- 刷题界面 -->
                         <div class="practice-area" id="practice-area" style="display: none;">
                             <div class="question-card" id="question-card">
                                 <div class="question-header">
@@ -302,22 +421,17 @@
                                 <div class="options-list" id="options-list"></div>
                                 <div class="answer-result" id="answer-result" style="display: none;"></div>
                             </div>
-
                             <div class="practice-actions">
                                 <button class="btn btn-secondary" id="prev-btn" onclick="prevQuestion()" disabled>
                                     <i class="fas fa-arrow-left"></i> 上一题
                                 </button>
-                                <button class="btn btn-primary" id="submit-btn" onclick="submitAnswer()">
-                                    提交答案
-                                </button>
-                                <button class="btn btn-success" id="next-btn" onclick="nextQuestion()"
-                                    style="display: none;">
+                                <button class="btn btn-primary" id="submit-btn" onclick="submitAnswer()">提交答案</button>
+                                <button class="btn btn-success" id="next-btn" onclick="nextQuestion()" style="display: none;">
                                     下一题 <i class="fas fa-arrow-right"></i>
                                 </button>
                             </div>
                         </div>
 
-                        <!-- 练习结果 -->
                         <div class="practice-result" id="practice-result" style="display: none;">
                             <h2>练习完成!</h2>
                             <div class="result-stats">
@@ -342,18 +456,11 @@
                                     <span class="result-value" id="result-time">00:00</span>
                                 </div>
                             </div>
-
-                            <!-- 答题详情查看 -->
                             <div class="result-detail-section">
                                 <h3>答题详情</h3>
-                                <div class="result-nav-grid" id="result-nav-grid">
-                                    <!-- 动态生成题目导航 -->
-                                </div>
-                                <div class="result-question-detail" id="result-question-detail">
-                                    <!-- 动态生成当前题目详情 -->
-                                </div>
+                                <div class="result-nav-grid" id="result-nav-grid"></div>
+                                <div class="result-question-detail" id="result-question-detail"></div>
                             </div>
-
                             <div class="result-actions">
                                 <button class="btn btn-primary" onclick="restartWithSameSettings()">
                                     <i class="fas fa-redo"></i> 再来一次
@@ -363,17 +470,14 @@
                                 </button>
                             </div>
                         </div>
-                    </div><!-- end practice-main -->
+                    </div>
 
-                    <!-- 右侧：独立面板区域 -->
                     <div class="side-panels">
-                        <!-- 成绩排行榜（独立窗口，默认折叠） -->
                         <div class="side-panel collapsible-panel" id="ranking-panel-wrapper">
                             <div class="panel-header" onclick="togglePanel('ranking-panel-wrapper')">
-                                <h3><i class="fas fa-trophy"></i> 成绩排行榜</h3>
+                                <h3><i class="fas fa-trophy"></i> 排行榜</h3>
                                 <div class="panel-header-right">
-                                    <button class="btn btn-small btn-danger"
-                                        onclick="event.stopPropagation(); clearRankings()" title="清空排名">
+                                    <button class="btn btn-small btn-danger" onclick="event.stopPropagation(); clearRankings()" title="清空排名">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                     <i class="fas fa-chevron-down toggle-icon"></i>
@@ -385,8 +489,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- 做题进度（独立窗口，默认展开） -->
                         <div class="side-panel collapsible-panel" id="progress-panel-wrapper">
                             <div class="panel-header" onclick="togglePanel('progress-panel-wrapper')">
                                 <h3><i class="fas fa-bookmark"></i> 做题进度</h3>
@@ -398,42 +500,38 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- 答题卡（独立窗口，默认展开） -->
                         <div class="side-panel collapsible-panel" id="question-nav-panel" style="display: none;">
                             <div class="panel-header" onclick="togglePanel('question-nav-panel')">
                                 <span><i class="fas fa-th"></i> 答题卡</span>
                                 <div class="panel-header-right">
-                                    <span class="nav-stats"><span id="answered-count">0</span>/<span
-                                            id="nav-total">0</span></span>
+                                    <span class="nav-stats"><span id="answered-count">0</span>/<span id="nav-total">0</span></span>
                                     <i class="fas fa-chevron-down toggle-icon"></i>
                                 </div>
                             </div>
                             <div class="panel-content">
-                                <div class="question-nav-grid" id="question-nav-grid">
-                                    <!-- 动态生成题目导航按钮 -->
-                                </div>
+                                <div class="question-nav-grid" id="question-nav-grid"></div>
                             </div>
                         </div>
                     </div>
-                </div><!-- end practice-layout -->
+                </div>
             </div>
 
-            <!-- 错题本页 -->
             <div id="wrongbook-page" class="page">
-                <h1>错题本</h1>
+                <div class="section-header">
+                    <button class="btn btn-ghost" onclick="switchPage('dashboard')">
+                        <i class="fas fa-arrow-left"></i> 首页
+                    </button>
+                    <h1>错题本</h1>
+                </div>
                 <div class="manage-section">
-                    <div class="bank-list" id="wrong-bank-list">
-                        <!-- 错题按题库分类列表将通过JS动态生成 -->
-                    </div>
+                    <div class="bank-list" id="wrong-bank-list"></div>
                     <div class="question-browser" id="wrong-question-browser" style="display: none;">
                         <div class="browser-header">
                             <button class="btn btn-secondary" onclick="showWrongBankList()">
                                 <i class="fas fa-arrow-left"></i> 返回
                             </button>
                             <h2 id="wrong-current-bank-name"></h2>
-                            <button class="btn btn-danger btn-small" onclick="clearWrongQuestionsByBank()"
-                                style="margin-left: auto;">
+                            <button class="btn btn-danger btn-small" onclick="clearWrongQuestionsByBank()" style="margin-left: auto;">
                                 <i class="fas fa-trash"></i> 清空此题库错题
                             </button>
                         </div>
@@ -442,16 +540,51 @@
                 </div>
             </div>
 
-            <!-- 设置页（隐藏占位，已禁用） -->
             <div id="settings-page" class="page" style="display: none;"></div>
         </main>
     </div>
 
-    <!-- 通知提示 -->
     <div class="toast-container" id="toast-container"></div>
 
-    <!-- 确认对话框 -->
-    <div class="modal" id="confirm-modal">
+            <footer class="site-footer">
+                <div class="footer-fence-wrap"></div>
+                <div class="footer-body">
+                    <div class="footer-inner">
+                        <div class="footer-left">
+                            <div class="footer-logo">炸红题库</div>
+                            <div class="footer-social">
+                                <span class="footer-social-label">OFFICIAL</span>
+                                <a href="#"><i class="fab fa-github"></i></a>
+                                <a href="#"><i class="fab fa-weixin"></i></a>
+                                <a href="#"><i class="fab fa-qq"></i></a>
+                                <a href="#"><i class="fab fa-weibo"></i></a>
+                            </div>
+                        </div>
+                        <div class="footer-right">
+                            <div class="footer-menu-line"></div>
+                            <nav class="footer-nav">
+                                <a class="footer-nav-item" href="javascript:;">首页</a>
+                                <a class="footer-nav-item" href="javascript:;">刷题</a>
+                                <a class="footer-nav-item" href="javascript:;">错题本</a>
+                                <a class="footer-nav-item" href="javascript:;">导入</a>
+                                <a class="footer-nav-item" href="javascript:;">统计</a>
+                            </nav>
+                            <div class="footer-totop-col" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+                                <div class="footer-totop-line"></div>
+                                <span class="footer-totop-text">TO TOP</span>
+                                <span class="footer-totop-dot"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="footer-bottom">
+                        <span>© DHU 炸红题库</span>
+                        <a href="#">隐私政策</a>
+                    </div>
+                </div>
+            </footer>
+        </div>
+
+        <div class="modal" id="confirm-modal">
         <div class="modal-content">
             <h3 id="confirm-title">确认</h3>
             <p id="confirm-message">确定要执行此操作吗？</p>
@@ -462,7 +595,6 @@
         </div>
     </div>
 
-    <!-- 题目编辑对话框 -->
     <div class="modal" id="edit-modal">
         <div class="modal-content modal-large">
             <h3>编辑题目</h3>
@@ -481,8 +613,7 @@
                 <div class="form-group">
                     <label>选项</label>
                     <div id="edit-options"></div>
-                    <button class="btn btn-secondary btn-small" type="button" onclick="addEditOption()"
-                        style="margin-top: 8px;">
+                    <button class="btn btn-secondary btn-small" type="button" onclick="addEditOption()" style="margin-top: 8px;">
                         <i class="fas fa-plus"></i> 添加选项
                     </button>
                 </div>
@@ -498,16 +629,19 @@
         </div>
     </div>
 
-    <!-- 依赖库 -->
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script src="js/lib/mammoth.browser.min.js"></script>
     <script src="js/lib/dexie.min.js"></script>
-
-    <!-- 核心模块 -->
     <script src="js/modules/storage.js"></script>
     <script src="js/modules/parser.js"></script>
-
     <script src="js/app.js"></script>
     <script src="js/mobile.js"></script>
+
+    <button class="gnav-menu-btn" id="gnavMenuBtn" onclick="toggleMobileMenu()">
+        <div class="menu-lines">
+            <span></span><span></span><span></span>
+        </div>
+    </button>
 </body>
 
 </html>

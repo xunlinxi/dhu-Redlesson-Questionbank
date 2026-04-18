@@ -93,7 +93,8 @@ def main():
             host='0.0.0.0',
             port=50000,
             debug=False,
-            use_reloader=False
+            use_reloader=False,
+            threaded=True
         )
     except KeyboardInterrupt:
         print("\n服务器已停止")
