@@ -49,6 +49,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     if (window.STATIC_MODE) {
         serverOnline = true;
+        await loadStats();
+        loadBankChapters();
     }
 
     await loadConfig();

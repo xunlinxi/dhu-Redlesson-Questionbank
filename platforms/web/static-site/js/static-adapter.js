@@ -10,13 +10,20 @@
 
     window.storageService = {
         isMobile: false,
+        async ensureLoaded() {
+            if (typeof Questions !== 'undefined' && !Questions._loaded) {
+                await Questions.init();
+            }
+        },
         async getStats() {
+            await this.ensureLoaded();
             const bankList = Questions.getBankList();
             let totalSingle = 0, totalMulti = 0;
             bankList.forEach(b => { totalSingle += b.singleCount || 0; totalMulti += b.multiCount || 0; });
             return { success: true, stats: { total_banks: bankList.length, total_questions: Questions.getTotalCount(), single_choice_count: totalSingle, multi_choice_count: totalMulti } };
         },
         async getStatsByBank() {
+            await this.ensureLoaded();
             const bankList = Questions.getBankList();
             const stats = {};
             bankList.forEach(b => {
@@ -28,13 +35,16 @@
             return { success: true, stats };
         },
         async getBanks() {
+            await this.ensureLoaded();
             const bankList = Questions.getBankList();
             return { success: true, banks: bankList.map(b => ({ name: b.name, question_count: b.totalQuestions, total_questions: b.totalQuestions, single_count: b.singleCount, multi_count: b.multiCount, chapters: b.chapters, semester: b.semester, source_file: b.source_file || '静态数据', import_time: b.import_time || '预置' })) };
         },
         async getChapters(bankName) {
+            await this.ensureLoaded();
             return { success: true, chapters: Questions.getChapters(bankName) };
         },
         async getQuestions(filters = {}) {
+            await this.ensureLoaded();
             const bankName = filters.bank;
             const chapter = filters.chapter;
             let questions = bankName ? Questions.getByBank(bankName) : Questions.getAllQuestions();
@@ -42,6 +52,7 @@
             return { success: true, questions };
         },
         async getPracticeRandom(filters) {
+            await this.ensureLoaded();
             const bankName = filters.bank;
             const singleCount = parseInt(filters.single_count || '0');
             const multiCount = parseInt(filters.multi_count || '0');
@@ -54,6 +65,7 @@
             return { success: true, questions: [...singles, ...multis] };
         },
         async getPracticeSequence(filters) {
+            await this.ensureLoaded();
             const bankName = filters.bank;
             const chapter = filters.chapter;
             const shuffle = filters.shuffle === 'true';
@@ -161,20 +173,21 @@
     }
     
     function loadInitialData() {
-        // 更新统计信息
-        const totalQuestions = Questions.getTotalCount();
         const bankList = Questions.getBankList();
-        const wrongCount = Wrongbook.getTotalCount();
-        
-        // 更新首页统计
+        let totalSingle = 0, totalMulti = 0;
+        bankList.forEach(b => { totalSingle += b.singleCount || 0; totalMulti += b.multiCount || 0; });
+
+        const totalBanksEl = document.getElementById('total-banks');
+        if (totalBanksEl) totalBanksEl.textContent = bankList.length;
+
         const totalEl = document.getElementById('total-questions');
-        if (totalEl) totalEl.textContent = totalQuestions;
-        
-        const bankCountEl = document.getElementById('bank-count');
-        if (bankCountEl) bankCountEl.textContent = bankList.length;
-        
-        const wrongEl = document.getElementById('wrong-count');
-        if (wrongEl) wrongEl.textContent = wrongCount;
+        if (totalEl) totalEl.textContent = Questions.getTotalCount();
+
+        const singleEl = document.getElementById('single-count');
+        if (singleEl) singleEl.textContent = totalSingle;
+
+        const multiEl = document.getElementById('multi-count');
+        if (multiEl) multiEl.textContent = totalMulti;
     }
     
     // DOM加载完成后初始化
