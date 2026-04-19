@@ -101,7 +101,7 @@
                     </div>
                     <div class="hero-secondary-actions">
                         <button class="btn btn-danger-solid btn-sm" onclick="confirmClearCache()">
-                            <i class="fas fa-trash-alt"></i> 清空缓存
+                            <img src="img/deco/character_changebtn.svg" style="width:16px;height:16px;animation:refreshSpin 3s linear infinite;vertical-align:middle;margin-right:4px"> 清空缓存
                         </button>
                         <div class="hero-scroll-indicator" id="heroScrollIndicator">
                             <span class="scroll-dot"></span>
@@ -134,15 +134,12 @@
                     </div>
                 </section>
 
-                <section class="bento-grid-single scroll-reveal">
+                <section class="bento-grid scroll-reveal">
                     <div class="bento-card bento-wide shimmer" onclick="switchPage('practice')" style="cursor:pointer">
                         <div class="bento-icon"><i class="fas fa-pen"></i></div>
                         <h3>开始练习</h3>
                         <p>选择题库和模式，开始答题</p>
                     </div>
-                </section>
-
-                <section class="bento-grid scroll-reveal">
                     <div class="bento-card" onclick="switchPage('import')" style="cursor:pointer">
                         <div class="bento-icon accent"><i class="fas fa-upload"></i></div>
                         <h3>导入题库</h3>
@@ -559,20 +556,19 @@
                             <div class="footer-logo">炸红题库</div>
                             <div class="footer-social">
                                 <span class="footer-social-label">OFFICIAL</span>
-                                <a href="#"><i class="fab fa-github"></i></a>
-                                <a href="#"><i class="fab fa-weixin"></i></a>
-                                <a href="#"><i class="fab fa-qq"></i></a>
-                                <a href="#"><i class="fab fa-weibo"></i></a>
+                                <a href="https://github.com/xunlinxi/dhu-Redlesson-Questionbank" target="_blank" rel="noopener"><i class="fab fa-github"></i></a>
+                                <a href="javascript:void(0)"><i class="fab fa-weixin"></i></a>
+                                <a href="javascript:void(0)"><i class="fab fa-qq"></i></a>
+                                <a href="javascript:void(0)"><i class="fab fa-weibo"></i></a>
                             </div>
                         </div>
                         <div class="footer-right">
-                            <div class="footer-menu-line"></div>
                             <nav class="footer-nav">
-                                <a class="footer-nav-item" href="javascript:;">首页</a>
-                                <a class="footer-nav-item" href="javascript:;">刷题</a>
-                                <a class="footer-nav-item" href="javascript:;">错题本</a>
-                                <a class="footer-nav-item" href="javascript:;">导入</a>
-                                <a class="footer-nav-item" href="javascript:;">统计</a>
+                                <span class="footer-nav-item">首页</span>
+                                <span class="footer-nav-item">刷题</span>
+                                <span class="footer-nav-item">错题本</span>
+                                <span class="footer-nav-item">导入</span>
+                                <span class="footer-nav-item">统计</span>
                             </nav>
                             <div class="footer-totop-col" onclick="window.scrollTo({top:0,behavior:'smooth'})">
                                 <span class="footer-totop-line"><span class="footer-totop-line-fill"></span></span>
@@ -582,8 +578,7 @@
                         </div>
                     </div>
                     <div class="footer-bottom">
-                        <span>© DHU 炸红题库</span>
-                        <a href="#">隐私政策</a>
+                        <span>© 2025-2026 DHU 炸红题库. All rights reserved.</span>
                     </div>
                 </div>
             </footer>

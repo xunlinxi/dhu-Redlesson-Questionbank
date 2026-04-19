@@ -80,6 +80,7 @@ body {
 }
 .server-error-banner i { font-size: 18px; animation: pulse 1.5s ease-in-out infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+@keyframes refreshSpin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
 .server-error-banner .btn-small {
     padding: 5px 15px; font-size: 12px;
     background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
@@ -208,10 +209,6 @@ body {
 .hero-secondary-actions {
     margin-top: 16px;
     display: flex; justify-content: center; gap: 10px;
-    visibility: visible !important;
-    opacity: 1 !important;
-    height: auto !important;
-    overflow: visible !important;
 }
 
 .hero-scroll-indicator {
@@ -2153,19 +2150,16 @@ select.form-control {
 .site-footer .footer-right {
     display: flex; align-items: flex-start; gap: 30px; position: relative;
 }
-.site-footer .footer-menu-line {
-    width: 1px; height: 80px; background: rgba(255,255,255,0.15);
-    flex-shrink: 0;
-}
 .site-footer .footer-nav {
     display: flex; gap: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.15);
 }
 .site-footer .footer-nav-item {
     writing-mode: vertical-rl; text-orientation: mixed;
     font-size: 12px; letter-spacing: 2px; opacity: 0.5;
-    cursor: pointer; transition: all .3s; color: #fff; text-decoration: none;
+    transition: all .3s; color: #fff; cursor: default;
 }
-.site-footer .footer-nav-item:hover { opacity: 1; color: var(--accent); }
 .site-footer .footer-totop-col {
     display: flex; flex-direction: column; align-items: center; gap: 0;
     cursor: pointer; transition: all .3s;
@@ -2205,8 +2199,9 @@ select.form-control {
 .site-footer .footer-bottom {
     max-width: 800px; margin: 16px auto 0; padding-top: 12px;
     border-top: 1px solid rgba(255,255,255,0.1);
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 10px; opacity: 0.35;
+    display: flex; justify-content: center; align-items: center;
+    font-size: 11px; opacity: 0.4;
+    letter-spacing: 0.5px;
 }
 .site-footer .footer-bottom a { color: #fff; text-decoration: none; transition: opacity .3s; }
 .site-footer .footer-bottom a:hover { opacity: 0.7; }
@@ -2249,7 +2244,11 @@ select.form-control {
     .deco-flower { opacity: 0.1; }
     .deco-sun, .deco-refresh-btn, .deco-umbrella,
     .deco-dashed-border, .deco-fence, .deco-cloud-frame { display: none !important; }
-    .gnav-menu-btn { display: block; }
+    .gnav-menu-btn { display: block; width: 40px; height: 40px; top: 10px; right: 10px; }
+    .gnav-menu-btn .menu-lines { width: 18px; height: 12px; }
+    .gnav-menu-btn .menu-lines span { height: 1.5px; }
+    .gnav-menu-btn.is-active .menu-lines span:nth-child(1) { transform: translateY(5.25px) rotate(45deg); }
+    .gnav-menu-btn.is-active .menu-lines span:nth-child(3) { transform: translateY(-5.25px) rotate(-45deg); }
     .top-nav .nav-links { display: none; }
     .top-nav .nav-links.is-open {
         display: flex; flex-direction: column;
