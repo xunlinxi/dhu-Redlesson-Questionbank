@@ -103,6 +103,11 @@
                         <button class="btn btn-danger-solid btn-sm" onclick="confirmClearCache()">
                             <img src="img/deco/character_changebtn.svg" style="width:16px;height:16px;animation:refreshSpin 3s linear infinite;vertical-align:middle;margin-right:4px"> 清空缓存
                         </button>
+                        <div class="hero-scroll-indicator" id="heroScrollIndicator">
+                            <span class="scroll-dot"></span>
+                            <span class="scroll-line"><span class="scroll-line-fill"></span></span>
+                            <span class="scroll-text">SCROLL</span>
+                        </div>
                     </div>
                 </section>
 
@@ -223,8 +228,14 @@
                         </div>
                     </div>
                     <div class="features-swiper-nav">
-                        <button class="carousel-btn prev" id="featurePrev"><img src="img/deco/character_arrow.svg" alt=""></button>
-                        <button class="carousel-btn next" id="featureNext"><img src="img/deco/character_arrow.svg" alt=""></button>
+                        <button class="carousel-btn prev" id="featurePrev">
+                            <span class="carousel-btn-arrow"><img src="img/deco/character_arrow.svg" alt=""></span>
+                            <span class="carousel-btn-label">PREV</span>
+                        </button>
+                        <button class="carousel-btn next" id="featureNext">
+                            <span class="carousel-btn-arrow"><img src="img/deco/character_arrow.svg" alt=""></span>
+                            <span class="carousel-btn-label">NEXT</span>
+                        </button>
                     </div>
                     <div class="swiper-pagination features-pagination" id="featuresPagination"></div>
                     <div class="features-umbrellas">
@@ -570,7 +581,7 @@
                                 <a class="footer-nav-item" href="javascript:;">统计</a>
                             </nav>
                             <div class="footer-totop-col" onclick="window.scrollTo({top:0,behavior:'smooth'})">
-                                <div class="footer-totop-line"></div>
+                                <span class="footer-totop-line"><span class="footer-totop-line-fill"></span></span>
                                 <span class="footer-totop-text">TO TOP</span>
                                 <span class="footer-totop-dot"></span>
                             </div>

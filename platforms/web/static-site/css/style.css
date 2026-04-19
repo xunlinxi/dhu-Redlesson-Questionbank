@@ -51,12 +51,12 @@ body {
     font-family: var(--font-main);
     background-color: #f0f0f8;
     background-image:
-        url('/img/deco/bg_light.png'),
+        url('img/deco/bg_light.png'),
         linear-gradient(45deg, rgba(0,192,195,0.24) 25%, transparent 25%, transparent 75%, rgba(0,192,195,0.24) 75%),
         linear-gradient(45deg, rgba(0,192,195,0.24) 25%, transparent 25%, transparent 75%, rgba(0,192,195,0.24) 75%),
         linear-gradient(rgba(255,99,93,0.18) 1px, transparent 1px),
         linear-gradient(90deg, rgba(0,192,195,0.18) 1px, transparent 1px);
-    background-size: 77px 133px, 40px 40px, 40px 40px, 60px 60px, 60px 60px;
+    background-size: 154px 266px, 40px 40px, 40px 40px, 60px 60px, 60px 60px;
     background-position: center, 0 0, 20px 20px, 0 0, 0 0;
     background-attachment: fixed;
     color: var(--text-primary);
@@ -191,7 +191,7 @@ body {
 .hero-title::before {
     content: ''; position: absolute; top: -44px; left: 50%; transform: translateX(-50%);
     width: 40px; height: 40px;
-    background: url('/img/deco/title_sun-r.webp') no-repeat center center / contain;
+    background: url('img/deco/title_sun-r.webp') no-repeat center center / contain;
     animation: sunRotate 20s linear infinite; opacity: 1;
 }
 .hero-subtitle {
@@ -208,6 +208,42 @@ body {
 .hero-secondary-actions {
     margin-top: 16px;
     display: flex; justify-content: center; gap: 10px;
+}
+
+.hero-scroll-indicator {
+    display: inline-flex; flex-direction: column; align-items: center; gap: 0;
+    margin-left: 12px; position: relative;
+    width: 50px; height: 80px; vertical-align: middle;
+}
+.hero-scroll-indicator .scroll-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--salmon); position: absolute; top: 0; left: 50%;
+    margin-left: -3.5px; z-index: 2; transition: all 0.3s;
+}
+.hero-scroll-indicator:hover .scroll-dot { top: calc(100% - 7px); }
+.hero-scroll-indicator .scroll-line {
+    position: absolute; left: 50%; width: 1px; top: 0; bottom: 0;
+    background: var(--text-secondary); margin-left: 0;
+}
+.hero-scroll-indicator .scroll-line-fill {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 0;
+    background: var(--salmon);
+    animation: scrollLineAnim 3s ease-in-out reverse infinite;
+}
+.hero-scroll-indicator:hover .scroll-line-fill {
+    animation: unset; height: 100%;
+}
+.hero-scroll-indicator .scroll-text {
+    writing-mode: vertical-rl; font-size: 9px; letter-spacing: 2px;
+    color: var(--text-secondary); font-weight: 600;
+    position: absolute; right: 0; top: 0; bottom: 0;
+    display: flex; justify-content: center; align-items: center;
+    width: 20px; line-height: 1;
+}
+@keyframes scrollLineAnim {
+    0% { height: 0; bottom: 0; }
+    20%, 40% { height: 100%; bottom: 0; }
+    60%, 100% { height: 0; bottom: 100%; }
 }
 
 .btn-sm {
@@ -1657,8 +1693,9 @@ select.form-control {
 
 .neon-line {
     position: fixed; pointer-events: none; z-index: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,99,93,0.08), rgba(0,192,195,0.06), transparent);
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,99,93,0.06), rgba(0,192,195,0.04), transparent);
+    filter: blur(0.5px);
 }
 .neon-line-1 { top: 30%; left: 0; right: 0; animation: lineSlide 15s ease-in-out infinite; }
 .neon-line-2 { bottom: 25%; left: 0; right: 0; background: linear-gradient(90deg, transparent, rgba(6,182,212,0.06), rgba(249,115,22,0.04), transparent); animation: lineSlide 20s ease-in-out infinite 5s; }
@@ -1741,7 +1778,7 @@ select.form-control {
 .section-deco-title::before {
     content: ''; position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
     width: clamp(40px, 5vw, 60px); height: clamp(40px, 5vw, 60px);
-    background: url('/img/deco/title_sun-r.webp') no-repeat center center / contain;
+    background: url('img/deco/title_sun-r.webp') no-repeat center center / contain;
     animation: sunRotate 20s linear infinite; opacity: 1;
 }
 .deco-title-line {
@@ -1862,15 +1899,19 @@ select.form-control {
 }
 
 .features-carousel {
-    position: relative; margin: 10px 0 0; padding: 0 0 10px;
+    position: relative; margin: 10px 0 0; padding: 0 60px 10px;
     display: flex; flex-direction: column; align-items: center;
 }
 .features-swiper {
     width: 100%; max-width: 1200px; padding: 40px 0;
     overflow: visible;
 }
+.features-swiper .swiper-wrapper {
+    transform-style: preserve-3d;
+}
 .features-swiper .swiper-slide {
     width: 420px; display: flex; justify-content: center;
+    backface-visibility: hidden;
 }
 .feature-card {
     background: var(--bg-card); backdrop-filter: blur(20px);
@@ -1905,17 +1946,31 @@ select.form-control {
 .feature-card p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
 
 .features-swiper-nav {
-    display: flex; justify-content: center; gap: clamp(200px, 30vw, 600px); margin-top: -10px;
+    position: absolute; left: 0; right: 0; top: 50%;
+    transform: translateY(-50%);
+    display: flex; justify-content: space-between;
+    pointer-events: none; z-index: 10;
+    padding: 0 4px;
 }
 .features-swiper-nav .carousel-btn {
-    width: 56px; height: 56px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; opacity: 0.6; transition: all .3s;
+    display: flex; flex-direction: column; align-items: center;
+    cursor: pointer; transition: all .3s;
     background: none; border: none; padding: 0;
+    color: var(--text-secondary);
+    pointer-events: auto;
 }
-.features-swiper-nav .carousel-btn:hover { opacity: 1; transform: scale(1.15); }
-.features-swiper-nav .carousel-btn.next img { transform: rotate(180deg); }
-.features-swiper-nav .carousel-btn img { width: 100%; height: 100%; }
+.features-swiper-nav .carousel-btn:hover { color: var(--accent); }
+.features-swiper-nav .carousel-btn.prev:hover { transform: translateX(-6px); }
+.features-swiper-nav .carousel-btn.next:hover { transform: translateX(6px); }
+.features-swiper-nav .carousel-btn-arrow {
+    height: 56px; display: flex; align-items: center; justify-content: center;
+    margin-bottom: 4px;
+}
+.features-swiper-nav .carousel-btn-arrow img { height: 100%; width: auto; }
+.features-swiper-nav .carousel-btn.next .carousel-btn-arrow img { transform: rotate(180deg); }
+.features-swiper-nav .carousel-btn-label {
+    font-size: 11px; letter-spacing: 2px; font-weight: 600;
+}
 
 .features-pagination { position: relative; margin-top: 12px; }
 .features-pagination .swiper-pagination-bullet {
@@ -1952,8 +2007,9 @@ select.form-control {
     .feature-icon { width: 56px; height: 56px; font-size: 24px; }
     .feature-card h4 { font-size: 17px; }
     .feature-card p { font-size: 12px; }
-    .features-swiper-nav { gap: clamp(100px, 20vw, 300px); }
-    .features-swiper-nav .carousel-btn { width: 40px; height: 40px; }
+    .features-carousel { padding: 0 40px 10px; }
+    .features-swiper-nav .carousel-btn-arrow { height: 40px; }
+    .features-swiper-nav .carousel-btn-label { font-size: 10px; }
     .features-umbrellas .umbrella-item { width: 55px; }
 }
 
@@ -2040,7 +2096,7 @@ select.form-control {
 }
 .site-footer .footer-fence-wrap {
     width: 100%; height: 60px; background: transparent;
-    background-image: url('/img/deco/deco_fence.svg');
+    background-image: url('img/deco/deco_fence.svg');
     background-repeat: repeat-x;
     background-size: auto 60px;
     background-position: center;
@@ -2090,20 +2146,40 @@ select.form-control {
 }
 .site-footer .footer-nav-item:hover { opacity: 1; color: var(--accent); }
 .site-footer .footer-totop-col {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    display: flex; flex-direction: column; align-items: center; gap: 0;
     cursor: pointer; transition: all .3s;
+    position: relative; width: 80px; height: 120px;
 }
 .site-footer .footer-totop-col:hover { opacity: 0.8; }
 .site-footer .footer-totop-line {
-    width: 1px; height: 30px; background: rgba(255,255,255,0.3);
+    position: absolute; left: 50%; width: 1px; top: 0; bottom: 0;
+    background: rgba(255,255,255,0.3); margin-left: 0;
 }
-.site-footer .footer-totop-col:hover .footer-totop-line { background: var(--accent); }
+.site-footer .footer-totop-line-fill {
+    position: absolute; top: 0; left: 0; right: 0; height: 0;
+    background: var(--accent);
+    animation: totopLineAnim 3s ease-in-out infinite;
+}
+.site-footer .footer-totop-col:hover .footer-totop-line-fill {
+    animation: unset; height: 100%;
+}
 .site-footer .footer-totop-text {
     writing-mode: vertical-rl; font-size: 11px; letter-spacing: 3px; opacity: 0.6;
+    position: absolute; right: 0; top: 0; bottom: 0;
+    display: flex; justify-content: center; align-items: center;
+    width: 30px; line-height: 1;
 }
 .site-footer .footer-totop-col:hover .footer-totop-text { opacity: 1; color: var(--accent); }
 .site-footer .footer-totop-dot {
-    width: 6px; height: 6px; border-radius: 50%; background: var(--salmon); margin-top: 4px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--salmon); position: absolute; bottom: 0; left: 50%;
+    margin-left: -4.5px; z-index: 2; transition: all 0.3s;
+}
+.site-footer .footer-totop-col:hover .footer-totop-dot { bottom: calc(100% - 9px); }
+@keyframes totopLineAnim {
+    0% { height: 0; top: 0; }
+    20%, 40% { height: 100%; top: 0; }
+    60%, 100% { height: 0; top: 100%; }
 }
 .site-footer .footer-bottom {
     max-width: 800px; margin: 16px auto 0; padding-top: 12px;
@@ -2132,7 +2208,7 @@ select.form-control {
 .gnav-menu-btn {
     position: fixed; top: 15px; right: 15px; z-index: 9999;
     width: 80px; height: 80px;
-    background: url('/img/deco/menu_bg.svg') no-repeat center center / contain;
+    background: url('img/deco/menu_bg.svg') no-repeat center center / contain;
     cursor: pointer; display: none;
     border: none; padding: 0;
 }
@@ -2162,3 +2238,11 @@ select.form-control {
         padding: 12px 0; box-shadow: 0 8px 24px rgba(0,0,0,0.1);
     }
 }
+
+body.static-mode .hero-actions .btn-glass { display: none; }
+body.static-mode .hero-secondary-actions { display: none; }
+body.static-mode .bento-grid { grid-template-columns: 1fr; }
+body.static-mode .bento-wide { grid-column: span 1; }
+body.static-mode [data-page="import"] { display: none !important; }
+body.static-mode #import-page { display: none !important; }
+body.static-mode .server-error-banner { display: none !important; }

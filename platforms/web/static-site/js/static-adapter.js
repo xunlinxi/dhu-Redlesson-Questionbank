@@ -6,10 +6,100 @@
 (function() {
     'use strict';
     
-    // 标记为静态模式
     window.STATIC_MODE = true;
-    
-    // 等待Questions模块加载完成
+
+    window.storageService = {
+        isMobile: false,
+        async getStats() {
+            const bankList = Questions.getBankList();
+            let totalSingle = 0, totalMulti = 0;
+            bankList.forEach(b => { totalSingle += b.singleCount || 0; totalMulti += b.multiCount || 0; });
+            return { success: true, stats: { total_banks: bankList.length, total_questions: Questions.getTotalCount(), single_choice_count: totalSingle, multi_choice_count: totalMulti } };
+        },
+        async getStatsByBank() {
+            const bankList = Questions.getBankList();
+            const stats = {};
+            bankList.forEach(b => {
+                const questions = Questions.getByBank(b.name);
+                const chapters = {};
+                questions.forEach(q => { const ch = q.chapter || '未分类'; chapters[ch] = (chapters[ch] || 0) + 1; });
+                stats[b.name] = { total: b.totalQuestions, single: b.singleCount, multi: b.multiCount, chapters };
+            });
+            return { success: true, stats };
+        },
+        async getBanks() {
+            const bankList = Questions.getBankList();
+            return { success: true, banks: bankList.map(b => ({ name: b.name, question_count: b.totalQuestions, total_questions: b.totalQuestions, single_count: b.singleCount, multi_count: b.multiCount, chapters: b.chapters, semester: b.semester, source_file: b.source_file || '静态数据', import_time: b.import_time || '预置' })) };
+        },
+        async getChapters(bankName) {
+            return { success: true, chapters: Questions.getChapters(bankName) };
+        },
+        async getQuestions(filters = {}) {
+            const bankName = filters.bank;
+            const chapter = filters.chapter;
+            let questions = bankName ? Questions.getByBank(bankName) : Questions.getAllQuestions();
+            if (chapter && chapter !== 'all' && chapter !== '') questions = questions.filter(q => q.chapter === chapter);
+            return { success: true, questions };
+        },
+        async getPracticeRandom(filters) {
+            const bankName = filters.bank;
+            const singleCount = parseInt(filters.single_count || '0');
+            const multiCount = parseInt(filters.multi_count || '0');
+            const chapter = filters.chapter;
+            let allQuestions = bankName ? Questions.getByBank(bankName) : Questions.getAllQuestions();
+            let filtered = allQuestions;
+            if (chapter && chapter !== 'all' && chapter !== '') filtered = allQuestions.filter(q => q.chapter === chapter);
+            const singles = [...filtered.filter(q => q.type === 'single')].sort(() => Math.random() - 0.5).slice(0, singleCount);
+            const multis = [...filtered.filter(q => q.type === 'multi')].sort(() => Math.random() - 0.5).slice(0, multiCount);
+            return { success: true, questions: [...singles, ...multis] };
+        },
+        async getPracticeSequence(filters) {
+            const bankName = filters.bank;
+            const chapter = filters.chapter;
+            const shuffle = filters.shuffle === 'true';
+            let allQuestions = bankName ? Questions.getByBank(bankName) : Questions.getAllQuestions();
+            if (chapter && chapter !== 'all' && chapter !== '') allQuestions = allQuestions.filter(q => q.chapter === chapter);
+            let singles = allQuestions.filter(q => q.type === 'single');
+            let multis = allQuestions.filter(q => q.type === 'multi');
+            if (shuffle) { singles = [...singles].sort(() => Math.random() - 0.5); multis = [...multis].sort(() => Math.random() - 0.5); }
+            return { success: true, questions: [...singles, ...multis], total: singles.length + multis.length };
+        },
+        async getPracticeWrong(filters) {
+            const bankName = filters.bank;
+            const wrongData = Wrongbook.getAll();
+            const bankWrong = wrongData.banks && wrongData.banks[bankName] ? wrongData.banks[bankName] : [];
+            return { success: true, questions: bankWrong };
+        },
+        async deleteBank(bankName) { return { success: true }; },
+        async importQuestions(bankName, questions) { return { success: true }; },
+        async getConfig() { return Storage.getSettings(); },
+        async saveConfig(config) { Storage.setSettings(config); return { success: true }; },
+        async clearAllCacheData() { localStorage.clear(); return { success: true }; },
+        async getRankings() {
+            const data = Rankings.getAll();
+            const rankings = (data.rankings || []).map(r => ({ name: r.playerName || r.name || '匿名', total: r.totalCount || r.total || 0, correct: r.correctCount || r.correct || 0, wrong: (r.totalCount || r.total || 0) - (r.correctCount || r.correct || 0), accuracy: r.accuracy || 0, time_spent: r.duration || r.time_spent || 0, time_display: r.timeDisplay || r.time_display || '', date: r.createTime || r.date || new Date().toISOString() }));
+            return { success: true, rankings };
+        },
+        async saveRanking(record) { Rankings.add(record); return { success: true }; },
+        async clearRankings() { Rankings.clear(); return { success: true }; },
+        async getWrongbookStats() { return { success: true, stats: Wrongbook.getStats() }; },
+        async getWrongBook(bankName) {
+            const data = Wrongbook.getAll();
+            return { success: true, questions: data.banks && data.banks[bankName] ? data.banks[bankName] : [] };
+        },
+        async addWrongQuestion(question) { Wrongbook.add(question.question, question.userAnswer); return { success: true }; },
+        async removeWrongQuestion(questionId) { return { success: true }; },
+        async getProgressList() { return Progress.getAll(); },
+        async saveProgress(data) { const result = Progress.save(data); return { success: true, progress: result.progress }; },
+        async getProgressById(id) { return Progress.load(id); },
+        async deleteProgress(id) { Progress.remove(id); return { success: true }; },
+        async submitAnswer(question, answer) {
+            const correctAnswer = question.answer || [];
+            const isCorrect = JSON.stringify([...answer].sort()) === JSON.stringify([...correctAnswer].sort());
+            return { isCorrect, correctAnswer, answered: answer };
+        }
+    };
+
     let initRetries = 0;
     const maxRetries = 50;
     
@@ -39,19 +129,34 @@
     }
     
     function hideServerFeatures() {
-        // 隐藏导入按钮
         document.querySelectorAll('.import-btn, [data-page="import"], [data-page="settings"]').forEach(el => {
             el.style.display = 'none';
         });
-        
-        // 隐藏删除按钮
+
         document.querySelectorAll('.btn-danger').forEach(el => {
             if (el.textContent.includes('删除')) {
                 el.style.display = 'none';
             }
         });
-        
-        // 添加静态模式标识
+
+        document.querySelectorAll('[onclick]').forEach(el => {
+            var onclick = el.getAttribute('onclick') || '';
+            if (onclick.includes("switchPage('import')")) {
+                el.style.display = 'none';
+            }
+        });
+
+        var importPage = document.getElementById('import-page');
+        if (importPage) importPage.style.display = 'none';
+
+        var heroImportBtn = document.querySelector('.hero-actions .btn-glass');
+        if (heroImportBtn && heroImportBtn.textContent.includes('导入题库')) {
+            heroImportBtn.style.display = 'none';
+        }
+
+        var heroClearBtn = document.querySelector('.hero-secondary-actions');
+        if (heroClearBtn) heroClearBtn.style.display = 'none';
+
         document.body.classList.add('static-mode');
     }
     

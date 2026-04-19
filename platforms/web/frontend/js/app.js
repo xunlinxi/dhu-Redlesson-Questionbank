@@ -2882,8 +2882,8 @@ function initFeaturesSwiper() {
         speed: 600,
         coverflowEffect: {
             rotate: -45,
-            stretch: 60,
-            depth: 200,
+            stretch: 63,
+            depth: 220,
             modifier: 1,
             slideShadows: false,
         },

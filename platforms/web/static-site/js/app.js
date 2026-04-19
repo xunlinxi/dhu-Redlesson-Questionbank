@@ -35,7 +35,10 @@ const NAV_PAGE_SIZE = 56; // 答题卡每页显示数量
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', async function() {
     initNavigation();
-    initUpload();
+
+    if (!window.STATIC_MODE) {
+        initUpload();
+    }
 
     // Electron 环境特殊处理
     if (isElectron) {
@@ -43,10 +46,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         await loadStats();
     }
 
+    if (window.STATIC_MODE) {
+        serverOnline = true;
+    }
+
     await loadConfig();
 
-    // Electron 环境不需要健康检查
-    if (!isElectron) {
+    // Electron 环境和静态模式不需要健康检查
+    if (!isElectron && !window.STATIC_MODE) {
         startHealthCheck();
     }
 
@@ -2882,8 +2889,8 @@ function initFeaturesSwiper() {
         speed: 600,
         coverflowEffect: {
             rotate: -45,
-            stretch: 60,
-            depth: 200,
+            stretch: 63,
+            depth: 220,
             modifier: 1,
             slideShadows: false,
         },
