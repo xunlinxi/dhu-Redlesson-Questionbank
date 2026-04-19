@@ -3,42 +3,62 @@
  */
 
 const Questions = {
-    // 题库数据缓存
     _data: null,
     _loaded: false,
+    _loadingPromise: null,
+    DATA_VERSION: 2,
 
-    /**
-     * 初始化 - 加载题库数据
-     */
+    _isValidCache(cached) {
+        if (!cached || !cached.banks || Object.keys(cached.banks).length === 0) return false;
+        if (cached._version !== this.DATA_VERSION) return false;
+        const firstBank = Object.values(cached.banks)[0];
+        return firstBank && Array.isArray(firstBank.questions);
+    },
+
     async init() {
         if (this._loaded) return true;
-        
+
+        if (this._loadingPromise) {
+            return this._loadingPromise;
+        }
+
+        this._loadingPromise = this._doInit();
         try {
-            // 先尝试从localStorage加载
+            return await this._loadingPromise;
+        } finally {
+            this._loadingPromise = null;
+        }
+    },
+
+    async _doInit() {
+        try {
             const cached = Storage.getQuestions();
-            if (cached && cached.banks && Object.keys(cached.banks).length > 0) {
+            if (this._isValidCache(cached)) {
                 this._data = cached;
                 this._loaded = true;
-                console.log('从缓存加载题库数据');
+                console.log('从缓存加载题库数据 (v' + (cached._version || '?') + ')');
                 return true;
             }
-            
-            // 从预置数据文件加载
+
+            if (cached && cached.banks && Object.keys(cached.banks).length > 0) {
+                console.log('缓存数据格式过旧，将重新加载');
+                Storage.remove(Storage.KEYS.QUESTIONS);
+            }
+
             const response = await fetch('./data/questions.json');
             if (response.ok) {
                 this._data = await response.json();
+                this._data._version = this.DATA_VERSION;
                 this._loaded = true;
-                // 缓存到localStorage
                 Storage.setQuestions(this._data);
-                console.log('从文件加载题库数据');
+                console.log('从文件加载题库数据，共 ' + this.getTotalCount() + ' 题');
                 return true;
             }
         } catch (e) {
             console.error('加载题库失败:', e);
         }
-        
-        // 使用空数据
-        this._data = { banks: {} };
+
+        this._data = { banks: {}, _version: this.DATA_VERSION };
         this._loaded = true;
         return false;
     },

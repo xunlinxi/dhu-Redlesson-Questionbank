@@ -114,9 +114,8 @@
 
     let initRetries = 0;
     const maxRetries = 50;
-    
+
     async function initStaticSite() {
-        // 等待依赖模块加载
         if (typeof Questions === 'undefined' || typeof Storage === 'undefined') {
             if (initRetries++ < maxRetries) {
                 setTimeout(initStaticSite, 100);
@@ -125,19 +124,14 @@
             console.error('依赖模块加载失败');
             return;
         }
-        
+
         console.log('初始化静态网站模式...');
-        
-        // 初始化题库数据
+
         await Questions.init();
-        
-        // 隐藏服务器相关功能
+
         hideServerFeatures();
-        
-        // 加载初始数据
-        loadInitialData();
-        
-        console.log('静态网站初始化完成');
+
+        console.log('静态网站初始化完成，题库数: ' + Questions.getBankList().length + '，总题数: ' + Questions.getTotalCount());
     }
     
     function hideServerFeatures() {
@@ -172,25 +166,6 @@
         document.body.classList.add('static-mode');
     }
     
-    function loadInitialData() {
-        const bankList = Questions.getBankList();
-        let totalSingle = 0, totalMulti = 0;
-        bankList.forEach(b => { totalSingle += b.singleCount || 0; totalMulti += b.multiCount || 0; });
-
-        const totalBanksEl = document.getElementById('total-banks');
-        if (totalBanksEl) totalBanksEl.textContent = bankList.length;
-
-        const totalEl = document.getElementById('total-questions');
-        if (totalEl) totalEl.textContent = Questions.getTotalCount();
-
-        const singleEl = document.getElementById('single-count');
-        if (singleEl) singleEl.textContent = totalSingle;
-
-        const multiEl = document.getElementById('multi-count');
-        if (multiEl) multiEl.textContent = totalMulti;
-    }
-    
-    // DOM加载完成后初始化
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initStaticSite);
     } else {
