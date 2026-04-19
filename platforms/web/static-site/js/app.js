@@ -35,6 +35,7 @@ const NAV_PAGE_SIZE = 56; // 答题卡每页显示数量
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', async function() {
     initNavigation();
+    initFeaturesCarousel();
 
     if (!window.STATIC_MODE) {
         initUpload();
@@ -2874,49 +2875,127 @@ function initNavScroll() {
     });
 }
 
-var featuresSwiper = null;
+var fcState = {
+    current: 0,
+    total: 0,
+    isDragging: false,
+    startX: 0,
+    currentX: 0,
+    dragThreshold: 30,
+    visibleCount: 5,
+    cardWidth: 420,
+    isAnimating: false
+};
 
-function initFeaturesSwiper() {
-    var container = document.querySelector('.features-swiper');
-    if (!container || typeof Swiper === 'undefined') return;
+function initFeaturesCarousel() {
+    var wrap = document.getElementById('featuresCardsWrap');
+    var track = document.getElementById('featuresCardsTrack');
+    if (!wrap || !track) return;
+    var cards = track.querySelectorAll('.feature-card');
+    fcState.total = cards.length;
+    fcState.current = 0;
+    if (fcState.total === 0) return;
 
-    featuresSwiper = new Swiper('.features-swiper', {
-        effect: 'coverflow',
-        grabCursor: true,
-        centeredSlides: true,
-        slidesPerView: 'auto',
-        loop: true,
-        speed: 600,
-        coverflowEffect: {
-            rotate: -45,
-            stretch: 63,
-            depth: 220,
-            modifier: 1,
-            slideShadows: false,
-        },
-        pagination: {
-            el: '#featuresPagination',
-            clickable: true,
-        },
-        navigation: {
-            prevEl: '#featurePrev',
-            nextEl: '#featureNext',
-        },
-        autoplay: {
-            delay: 4000,
-            disableOnInteraction: true,
-        },
-        breakpoints: {
-            769: {
-                coverflowEffect: {
-                    rotate: -45,
-                    depth: 300,
-                    modifier: 1,
-                    stretch: 70,
-                    slideShadows: false,
-                },
-            }
-        },
+    fcState.cardWidth = window.innerWidth <= 768 ? 260 : 420;
+
+    wrap.addEventListener('mousedown', function(e) {
+        if (fcState.isAnimating) return;
+        fcState.isDragging = true;
+        fcState.startX = e.clientX;
+        fcState.currentX = e.clientX;
+        wrap.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+        if (!fcState.isDragging) return;
+        fcState.currentX = e.clientX;
+    });
+    document.addEventListener('mouseup', function() {
+        if (!fcState.isDragging) return;
+        fcState.isDragging = false;
+        wrap.style.cursor = 'grab';
+        var dx = fcState.currentX - fcState.startX;
+        if (Math.abs(dx) > fcState.dragThreshold) {
+            scrollFeatures(dx > 0 ? -1 : 1);
+        }
+    });
+
+    wrap.addEventListener('touchstart', function(e) {
+        if (fcState.isAnimating) return;
+        fcState.isDragging = true;
+        fcState.startX = e.touches[0].clientX;
+        fcState.currentX = e.touches[0].clientX;
+        e.preventDefault();
+    }, { passive: false });
+    wrap.addEventListener('touchmove', function(e) {
+        if (!fcState.isDragging) return;
+        fcState.currentX = e.touches[0].clientX;
+    }, { passive: false });
+    wrap.addEventListener('touchend', function() {
+        if (!fcState.isDragging) return;
+        fcState.isDragging = false;
+        var dx = fcState.currentX - fcState.startX;
+        if (Math.abs(dx) > fcState.dragThreshold) {
+            scrollFeatures(dx > 0 ? -1 : 1);
+        }
+    });
+
+    window.addEventListener('resize', function() {
+        fcState.cardWidth = window.innerWidth <= 768 ? 260 : 420;
+        updateCarouselDisplay();
+    });
+
+    updateCarouselDisplay();
+}
+
+function scrollFeatures(direction) {
+    if (fcState.total === 0 || fcState.isAnimating) return;
+    fcState.current = (fcState.current + direction + fcState.total) % fcState.total;
+    fcState.isAnimating = true;
+    updateCarouselDisplay();
+    setTimeout(function() { fcState.isAnimating = false; }, 400);
+}
+
+function getCardOffsetFromCenter(idx, current) {
+    var diff = idx - current;
+    var half = Math.floor(fcState.total / 2);
+    if (diff > half) diff -= fcState.total;
+    if (diff < -half) diff += fcState.total;
+    return diff;
+}
+
+function updateCarouselDisplay() {
+    var wrap = document.getElementById('featuresCardsWrap');
+    var track = document.getElementById('featuresCardsTrack');
+    if (!wrap || !track || fcState.total === 0) return;
+
+    var wrapWidth = wrap.offsetWidth;
+    var wrapHeight = wrap.offsetHeight;
+    var cardW = fcState.cardWidth;
+    var cardH = 260;
+    var centerX = wrapWidth / 2 - cardW / 2;
+    var centerY = wrapHeight / 2 - cardH / 2;
+    var visibleCount = fcState.total >= 4 ? Math.floor(fcState.total / 2) : fcState.total;
+
+    var cards = track.querySelectorAll('.feature-card');
+    cards.forEach(function(card, i) {
+        var offset = getCardOffsetFromCenter(i, fcState.current);
+        var absOffset = Math.abs(offset);
+        var isVisible = absOffset <= Math.ceil(visibleCount / 2);
+        var scale = isVisible ? (1 - absOffset * 0.1) : 0.85;
+        var opacity = isVisible ? (1 - absOffset * 0.22) : 0;
+        var tx = centerX + offset * (cardW * 0.55);
+        var ty = centerY + absOffset * 10;
+        var zIndex = fcState.total - absOffset;
+
+        card.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s ease';
+        card.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) scale(' + scale + ')';
+        card.style.opacity = opacity;
+        card.style.zIndex = zIndex;
+        card.style.pointerEvents = isVisible ? 'auto' : 'none';
+
+        if (offset === 0) card.classList.add('is-active');
+        else card.classList.remove('is-active');
     });
 }
 

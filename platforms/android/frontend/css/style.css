@@ -1866,18 +1866,22 @@ select.form-control {
     display: flex; flex-direction: column; align-items: center;
 }
 .features-swiper {
-    width: 100%; max-width: 1200px; padding: 40px 0;
-    overflow: visible;
+    width: 100%; max-width: 1200px;
+    height: 320px;
+    overflow: hidden;
+    position: relative;
 }
-.features-swiper .swiper-slide {
-    width: 420px; display: flex; justify-content: center;
+.features-cards-track {
+    width: 100%; height: 100%;
+    position: relative;
 }
 .feature-card {
     background: var(--bg-card); backdrop-filter: blur(20px);
     border: 1px solid var(--border-color); border-radius: var(--radius);
-    padding: 48px 42px; text-align: center; width: 420px;
+    padding: 48px 42px; text-align: center;
+    width: 420px;
     box-shadow: 0 4px 20px rgba(0,40,50,0.08);
-    position: relative; transition: all .4s ease;
+    position: absolute;
 }
 .feature-card::after {
     content: ''; position: absolute; top: 0; left: 0; right: 0;
@@ -1885,10 +1889,10 @@ select.form-control {
     background: linear-gradient(90deg, #ff635d, #00c0c3, #f97316);
     background-size: 200% auto;
     animation: featureBarShift 3s linear infinite;
-    opacity: 0; transition: opacity .3s;
+    opacity: 0;
+    transition: opacity .3s;
 }
-.swiper-slide-active .feature-card::after { opacity: 1; }
-.swiper-slide-active .feature-card { box-shadow: 0 8px 30px rgba(0,40,50,0.12); }
+.feature-card.is-active::after { opacity: 1; }
 
 @keyframes featureBarShift { 0%{background-position:0%} 100%{background-position:200%} }
 .feature-icon {
@@ -1905,17 +1909,38 @@ select.form-control {
 .feature-card p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
 
 .features-swiper-nav {
-    display: flex; justify-content: center; gap: clamp(200px, 30vw, 600px); margin-top: -10px;
+    position: absolute; left: 0; right: 0; top: 0; height: 100%;
+    display: flex; justify-content: space-between;
+    pointer-events: none; z-index: 20;
+    padding: 0;
 }
 .features-swiper-nav .carousel-btn {
-    width: 56px; height: 56px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; opacity: 0.6; transition: all .3s;
-    background: none; border: none; padding: 0;
+    position: absolute;
+    top: 25%;
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: rgba(0,192,195,0.15);
+    border: 1px solid rgba(0,192,195,0.25);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--accent);
+    pointer-events: auto;
+    transition: all .3s;
 }
-.features-swiper-nav .carousel-btn:hover { opacity: 1; transform: scale(1.15); }
-.features-swiper-nav .carousel-btn.next img { transform: rotate(180deg); }
-.features-swiper-nav .carousel-btn img { width: 100%; height: 100%; }
+.features-swiper-nav .carousel-btn:hover {
+    background: rgba(0,192,195,0.3);
+    transform: scale(1.1);
+}
+.features-swiper-nav .carousel-btn.prev { left: calc(50% - 270px); }
+.features-swiper-nav .carousel-btn.next { right: calc(50% - 270px); }
+.features-swiper-nav .carousel-btn-arrow {
+    height: 24px; display: flex; align-items: center; justify-content: center;
+}
+.features-swiper-nav .carousel-btn-arrow img { height: 100%; width: auto; }
+.features-swiper-nav .carousel-btn.next .carousel-btn-arrow img { transform: rotate(180deg); }
+.features-swiper-nav .carousel-btn-label {
+    display: none;
+}
 
 .features-pagination { position: relative; margin-top: 12px; }
 .features-pagination .swiper-pagination-bullet {
@@ -1947,13 +1972,15 @@ select.form-control {
     .neon-text { font-size: clamp(14px, 5vw, 20px); letter-spacing: 3px; }
     .deco-title-sub { font-size: clamp(12px, 4vw, 18px); letter-spacing: 2px; }
     .deco-coin { width: 20px; height: 20px; }
-    .features-swiper .swiper-slide { width: 260px; }
     .feature-card { width: 260px; padding: 30px 22px; }
     .feature-icon { width: 56px; height: 56px; font-size: 24px; }
     .feature-card h4 { font-size: 17px; }
     .feature-card p { font-size: 12px; }
-    .features-swiper-nav { gap: clamp(100px, 20vw, 300px); }
+    .features-swiper { height: 260px; }
     .features-swiper-nav .carousel-btn { width: 40px; height: 40px; }
+    .features-swiper-nav .carousel-btn.prev { left: calc(50% - 155px); }
+    .features-swiper-nav .carousel-btn.next { right: calc(50% - 155px); }
+    .features-swiper-nav .carousel-btn-arrow { height: 18px; }
     .features-umbrellas .umbrella-item { width: 55px; }
 }
 

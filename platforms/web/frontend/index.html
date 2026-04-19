@@ -90,7 +90,7 @@
                         <div class="hero-visual-icon"><i class="fas fa-book-open"></i></div>
                     </div>
                     <h1 class="hero-title gradient-text-flow">炸红题库</h1>
-                    <p class="hero-subtitle">政治理论课程智能刷题系统 — 习概 / 毛概 / 思修 / 近代史</p>
+                    <p class="hero-subtitle">政治理论课程智能刷题系统 — 习概 / 毛概 / 思修 / 近代史 / 马原</p>
                     <div class="hero-actions">
                         <button class="btn btn-primary btn-giant" onclick="switchPage('practice')">
                             <i class="fas fa-play"></i> 开始刷题
@@ -101,7 +101,7 @@
                     </div>
                     <div class="hero-secondary-actions">
                         <button class="btn btn-danger-solid btn-sm" onclick="confirmClearCache()">
-                            <img src="img/deco/character_changebtn.svg" style="width:16px;height:16px;animation:refreshSpin 3s linear infinite;vertical-align:middle;margin-right:4px"> 清空缓存
+                            <i class="fas fa-trash-alt"></i> 清空缓存
                         </button>
                         <div class="hero-scroll-indicator" id="heroScrollIndicator">
                             <span class="scroll-dot"></span>
@@ -134,12 +134,15 @@
                     </div>
                 </section>
 
-                <section class="bento-grid scroll-reveal">
+                <section class="bento-grid-single scroll-reveal">
                     <div class="bento-card bento-wide shimmer" onclick="switchPage('practice')" style="cursor:pointer">
                         <div class="bento-icon"><i class="fas fa-pen"></i></div>
                         <h3>开始练习</h3>
                         <p>选择题库和模式，开始答题</p>
                     </div>
+                </section>
+
+                <section class="bento-grid scroll-reveal">
                     <div class="bento-card" onclick="switchPage('import')" style="cursor:pointer">
                         <div class="bento-icon accent"><i class="fas fa-upload"></i></div>
                         <h3>导入题库</h3>
@@ -195,49 +198,40 @@
                     </div>
                 </section>
                 <section class="features-carousel scroll-reveal" data-reveal-delay="300">
-                    <div class="swiper features-swiper">
-                        <div class="swiper-wrapper">
-                            <div class="swiper-slide">
-                                <div class="feature-card" data-color="cyan">
-                                    <div class="feature-icon"><i class="fas fa-bolt"></i></div>
-                                    <h4>智能刷题</h4>
-                                    <p>支持随机、顺序、考试、错题四种模式</p>
-                                </div>
+                    <div class="features-cards-wrap" id="featuresCardsWrap">
+                        <div class="features-cards-track" id="featuresCardsTrack">
+                            <div class="feature-card" data-color="cyan">
+                                <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+                                <h4>智能刷题</h4>
+                                <p>支持随机、顺序、考试、错题四种模式</p>
                             </div>
-                            <div class="swiper-slide">
-                                <div class="feature-card" data-color="orange">
-                                    <div class="feature-icon"><i class="fas fa-file-import"></i></div>
-                                    <h4>多格式导入</h4>
-                                    <p>支持 TXT、DOC、DOCX 格式题库文件</p>
-                                </div>
+                            <div class="feature-card" data-color="orange">
+                                <div class="feature-icon"><i class="fas fa-file-import"></i></div>
+                                <h4>多格式导入</h4>
+                                <p>支持 TXT、DOC、DOCX 格式题库文件</p>
                             </div>
-                            <div class="swiper-slide">
-                                <div class="feature-card" data-color="green">
-                                    <div class="feature-icon"><i class="fas fa-chart-bar"></i></div>
-                                    <h4>成绩统计</h4>
-                                    <p>实时记录正确率和用时，排行榜激励</p>
-                                </div>
+                            <div class="feature-card" data-color="green">
+                                <div class="feature-icon"><i class="fas fa-chart-bar"></i></div>
+                                <h4>成绩统计</h4>
+                                <p>实时记录正确率和用时，排行榜激励</p>
                             </div>
-                            <div class="swiper-slide">
-                                <div class="feature-card" data-color="salmon">
-                                    <div class="feature-icon"><i class="fas fa-save"></i></div>
-                                    <h4>进度保存</h4>
-                                    <p>随时保存做题进度，下次继续练习</p>
-                                </div>
+                            <div class="feature-card" data-color="salmon">
+                                <div class="feature-icon"><i class="fas fa-save"></i></div>
+                                <h4>进度保存</h4>
+                                <p>随时保存做题进度，下次继续练习</p>
                             </div>
                         </div>
                     </div>
                     <div class="features-swiper-nav">
-                        <button class="carousel-btn prev" id="featurePrev">
+                        <button class="carousel-btn prev" id="featurePrev" onclick="scrollFeatures(-1)">
                             <span class="carousel-btn-arrow"><img src="img/deco/character_arrow.svg" alt=""></span>
                             <span class="carousel-btn-label">PREV</span>
                         </button>
-                        <button class="carousel-btn next" id="featureNext">
+                        <button class="carousel-btn next" id="featureNext" onclick="scrollFeatures(1)">
                             <span class="carousel-btn-arrow"><img src="img/deco/character_arrow.svg" alt=""></span>
                             <span class="carousel-btn-label">NEXT</span>
                         </button>
                     </div>
-                    <div class="swiper-pagination features-pagination" id="featuresPagination"></div>
                     <div class="features-umbrellas">
                         <img class="umbrella-item" src="img/deco/deco_umbrella1.svg" alt="">
                         <img class="umbrella-item" src="img/deco/deco_umbrella2.svg" alt="">
