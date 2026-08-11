@@ -54,12 +54,14 @@ class WrongbookModel:
         for q in wrong_questions:
             bank = q.get('bank', '未知题库')
             if bank not in bank_stats:
-                bank_stats[bank] = {'total': 0, 'single': 0, 'multi': 0}
+                bank_stats[bank] = {'total': 0, 'single': 0, 'multi': 0, 'judge': 0}
             bank_stats[bank]['total'] += 1
             if q.get('type') == 'single':
                 bank_stats[bank]['single'] += 1
-            else:
+            elif q.get('type') == 'multi':
                 bank_stats[bank]['multi'] += 1
+            elif q.get('type') == 'judge':
+                bank_stats[bank]['judge'] += 1
         
         return bank_stats, len(wrong_questions)
     

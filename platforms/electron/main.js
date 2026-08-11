@@ -523,28 +523,30 @@ ipcMain.handle('practice-random', async (event, filters = {}) => {
         
         console.log(`[practice-random] 找到总题目数: ${allQuestions.length}`);
 
-        // 2. 分离单选题和多选题
+        // 2. 分离单选题、多选题和判断题
         const singleQuestions = allQuestions.filter(q => q.type === 'single');
         const multiQuestions = allQuestions.filter(q => q.type === 'multi');
+        const judgeQuestions = allQuestions.filter(q => q.type === 'judge');
         
-        console.log(`[practice-random] 单选题: ${singleQuestions.length}, 多选题: ${multiQuestions.length}`);
+        console.log(`[practice-random] 单选题: ${singleQuestions.length}, 多选题: ${multiQuestions.length}, 判断题: ${judgeQuestions.length}`);
 
         // 3. 按照请求数量抽取
         const targetSingle = parseInt(filters.single_count) || 0;
         const targetMulti = parseInt(filters.multi_count) || 0;
+        const targetJudge = parseInt(filters.judge_count) || 0;
         
-        // 随机混洗
-        const shuffledSingle = singleQuestions.sort(() => Math.random() - 0.5);
-        const shuffledMulti = multiQuestions.sort(() => Math.random() - 0.5);
+        // 随机混洗（不修改原数组）
+        const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
         
         // 截取
-        const selectedSingle = shuffledSingle.slice(0, targetSingle);
-        const selectedMulti = shuffledMulti.slice(0, targetMulti);
+        const selectedSingle = shuffle(singleQuestions).slice(0, targetSingle);
+        const selectedMulti = shuffle(multiQuestions).slice(0, targetMulti);
+        const selectedJudge = shuffle(judgeQuestions).slice(0, targetJudge);
         
         // 4. 合并结果
-        const finalQuestions = [...selectedSingle, ...selectedMulti];
+        const finalQuestions = [...selectedSingle, ...selectedMulti, ...selectedJudge];
         
-        console.log(`[practice-random] 返回题目数: ${finalQuestions.length} (单:${selectedSingle.length} 多:${selectedMulti.length})`);
+        console.log(`[practice-random] 返回题目数: ${finalQuestions.length} (单:${selectedSingle.length} 多:${selectedMulti.length} 判:${selectedJudge.length})`);
 
         return { success: true, questions: finalQuestions, total: finalQuestions.length };
     } catch (error) {
@@ -571,14 +573,30 @@ ipcMain.handle('practice-sequence', async (event, filters = {}) => {
 ipcMain.handle('practice-wrong', async (event, filters = {}) => {
     try {
         const wrongQuestions = WrongbookModel.getWrongQuestions(filters);
-        const count = filters.single_count || filters.multi_count || wrongQuestions.length;
 
-        // 随机抽取
-        const shuffled = wrongQuestions.sort(() => Math.random() - 0.5);
-        const questions = shuffled.slice(0, Math.min(count, shuffled.length));
+        // 随机混洗（不修改原数组）
+        const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
+
+        const singleQuestions = wrongQuestions.filter(q => q.type === 'single');
+        const multiQuestions = wrongQuestions.filter(q => q.type === 'multi');
+        const judgeQuestions = wrongQuestions.filter(q => q.type === 'judge');
+
+        const targetSingle = parseInt(filters.single_count) || 0;
+        const targetMulti = parseInt(filters.multi_count) || 0;
+        const targetJudge = parseInt(filters.judge_count) || 0;
+
+        let questions = [];
+        if (targetSingle || targetMulti || targetJudge) {
+            questions = questions.concat(shuffle(singleQuestions).slice(0, targetSingle));
+            questions = questions.concat(shuffle(multiQuestions).slice(0, targetMulti));
+            questions = questions.concat(shuffle(judgeQuestions).slice(0, targetJudge));
+        } else {
+            questions = shuffle(wrongQuestions);
+        }
 
         return { success: true, questions, total: questions.length };
     } catch (error) {
+        console.error('[practice-wrong] 错误:', error);
         return { success: false, error: error.message };
     }
 });
@@ -626,11 +644,12 @@ ipcMain.handle('get-wrongbook-stats', async () => {
 
         wrongQuestions.forEach(q => {
             if (!stats[q.bank]) {
-                stats[q.bank] = { total: 0, single: 0, multi: 0 };
+                stats[q.bank] = { total: 0, single: 0, multi: 0, judge: 0 };
             }
             stats[q.bank].total++;
             if (q.type === 'single') stats[q.bank].single++;
-            if (q.type === 'multi') stats[q.bank].multi++;
+            else if (q.type === 'multi') stats[q.bank].multi++;
+            else if (q.type === 'judge') stats[q.bank].judge++;
         });
 
         // 计算总数

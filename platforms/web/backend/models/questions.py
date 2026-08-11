@@ -46,7 +46,8 @@ class QuestionsModel:
                 "name": name,
                 "question_count": question_count,
                 "import_time": info.get('import_time', ''),
-                "source_file": info.get('source_file', '')
+                "source_file": info.get('source_file', ''),
+                "semester": info.get('semester', '')
             })
         return bank_list
     

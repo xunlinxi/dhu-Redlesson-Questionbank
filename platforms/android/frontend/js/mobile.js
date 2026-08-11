@@ -280,19 +280,18 @@ function handleRankings(url, options) {
         var body = JSON.parse(options.body);
         rankings.unshift({
             id: Date.now().toString(),
-            player_name: body.player_name || '匿名',
-            bank_name: body.bank_name || '混合题库',
-            score: body.score || 0,
+            name: body.name || body.player_name || '匿名',
             total: body.total || 0,
             correct: body.correct || 0,
+            wrong: body.wrong || 0,
             accuracy: body.accuracy || 0,
-            time_used: body.time_used || '00:00',
-            mode: body.mode || 'random',
+            time_spent: body.time_spent || 0,
+            time_display: body.time_display || body.time_used || '00:00',
             date: new Date().toLocaleString('zh-CN')
         });
         if (rankings.length > 100) rankings.length = 100;
         localStorage.setItem('quiz_rankings', JSON.stringify(rankings));
-        if (body.player_name) localStorage.setItem('quiz_player_name', body.player_name);
+        if (body.name) localStorage.setItem('quiz_player_name', body.name);
         return mockResponse({ success: true, message: '成绩已保存' });
     }
     

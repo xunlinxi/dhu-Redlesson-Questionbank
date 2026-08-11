@@ -72,6 +72,33 @@ B. 选项B
 2. .doc 文件解析需要安装 Microsoft Word（仅 Windows）
 3. 热点访问需临时关闭防火墙，使用后请重新开启
 
+## 最近更新
+
+### v0.7.4 — Web / Android / Electron 多端 bug 修复（2026-08-11）
+
+**Web 端（Flask）**
+
+- 修复模拟考试倒计时结束时未判分、全部按未作答处理的问题
+- 修复服务器重连后练习会话被重置的问题；重连现在仅刷新侧栏数据并恢复已暂停的计时器
+- 错题本支持判断题练习（筛选、校验、数量显示、"再来一次"恢复）
+- 修复远程模式排行榜字段映射错位（`player_name`/`bank_name`/`score` → `name`/`accuracy`/`time_display`）
+- 题库名/错题列表/题目详情渲染增加 HTML 转义（`escapeAttr`），防止单引号破坏内联 onclick 及 XSS
+- `get_banks` 接口返回学期（`semester`）字段
+- 修复 `calculateExamResults` 原地排序污染用户答案数组的问题
+- 修复移动端未选题库时 `.where('bank').equals('')` 返回空结果的筛选 bug
+
+**Android（Capacitor）**
+
+- 同步上述 Web 端修复：考试判分、重连接管、排行榜字段、HTML 转义、排序污染、空题库筛选
+- 错题本统计与 `getPracticeWrong` 增加判断题计数与筛选
+
+**Electron（桌面端）**
+
+- 同步上述 Web 端修复
+- 后端 IPC `practice-random` / `practice-wrong` 增加判断题抽取，修复未按题型数量筛选及原地混洗问题
+- `get-wrongbook-stats` 增加判断题统计
+- 前端 `startPractice`（随机模式）补充 `judge_count` 参数
+
 ## 许可证
 
 MIT License

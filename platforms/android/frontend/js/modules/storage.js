@@ -207,13 +207,16 @@ class StorageService {
                 let result = [];
                 const singles = questions.filter(q => q.type === 'single');
                 const multis = questions.filter(q => q.type === 'multi');
+                const judges = questions.filter(q => q.type === 'judge');
 
                 const sCount = parseInt(params.single_count) || 0;
                 const mCount = parseInt(params.multi_count) || 0;
+                const jCount = parseInt(params.judge_count) || 0;
 
-                if (sCount > 0 || mCount > 0) {
+                if (sCount > 0 || mCount > 0 || jCount > 0) {
                     if (sCount > 0) result = result.concat(singles.slice(0, sCount));
                     if (mCount > 0) result = result.concat(multis.slice(0, mCount));
+                    if (jCount > 0) result = result.concat(judges.slice(0, jCount));
                 } else {
                     result = questions;
                 }
@@ -499,10 +502,11 @@ class StorageService {
                     const q = qMap[w.question_id];
                     if (!q) return; // Deleted question
                     
-                    if (!stats[w.bank]) stats[w.bank] = { total: 0, single: 0, multi: 0 };
+                    if (!stats[w.bank]) stats[w.bank] = { total: 0, single: 0, multi: 0, judge: 0 };
                     stats[w.bank].total++;
                     if (q.type === 'single') stats[w.bank].single++;
-                    else stats[w.bank].multi++;
+                    else if (q.type === 'multi') stats[w.bank].multi++;
+                    else if (q.type === 'judge') stats[w.bank].judge++;
                 });
                 
                 return { success: true, stats: stats };

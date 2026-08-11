@@ -101,7 +101,8 @@ async function checkServerHealth() {
                 serverOnline = true;
                 hideServerError();
                 showToast('系统连接已恢复', 'success');
-                switchPage(currentPage);
+                reloadPageData(currentPage);
+                resumePausedTimer();
             }
         } else {
             // Web 环境
@@ -118,8 +119,10 @@ async function checkServerHealth() {
                     serverOnline = true;
                     hideServerError();
                     showToast('服务器连接已恢复', 'success');
-                    // 重新加载当前页面数据
-                    switchPage(currentPage);
+                    // 重新加载当前页面数据（不重置进行中的练习会话）
+                    reloadPageData(currentPage);
+                    // 恢复因离线暂停的答题计时器
+                    resumePausedTimer();
                 }
             } else {
                 handleServerOffline();
@@ -127,6 +130,50 @@ async function checkServerHealth() {
         }
     } catch (error) {
         handleServerOffline();
+    }
+}
+
+// 重新加载页面数据，但保持进行中的练习会话不被重置
+function reloadPageData(page) {
+    if (page === 'practice') {
+        const practiceArea = document.getElementById('practice-area');
+        const practiceActive = practiceQuestions.length > 0 && practiceArea && practiceArea.style.display === 'block';
+        if (practiceActive) {
+            // 练习进行中：只刷新侧栏数据，不触碰答题区
+            loadRankings();
+            loadProgressList();
+            return;
+        }
+    }
+
+    switch(page) {
+        case 'dashboard':
+            loadStats();
+            loadBankChapters();
+            resetScrollReveal();
+            break;
+        case 'manage':
+            loadBanks();
+            break;
+        case 'wrongbook':
+            loadWrongBanks();
+            break;
+        case 'practice':
+            loadPracticeOptions();
+            showPracticeSettings();
+            loadRankings();
+            loadProgressList();
+            break;
+        case 'settings':
+            loadConfig();
+            break;
+    }
+}
+
+// 恢复因服务器离线而暂停的答题计时器
+function resumePausedTimer() {
+    if (practiceQuestions.length > 0 && remainingTime > 0 && !practiceTimer) {
+        practiceTimer = setInterval(updateTimer, 1000);
     }
 }
 
@@ -586,20 +633,20 @@ async function loadBanks() {
         if (data.success && data.banks.length > 0) {
             bankList.innerHTML = data.banks.map(bank => `
                 <div class="bank-card">
-                    <div class="bank-info" onclick="browseBank('${bank.name}')">
-                        <div class="bank-name">${bank.name}</div>
-                        ${bank.semester ? `<div class="bank-semester">${bank.semester}</div>` : ''}
+                    <div class="bank-info" onclick="browseBank('${escapeAttr(bank.name)}')">
+                        <div class="bank-name">${escapeHtml(bank.name)}</div>
+                        ${bank.semester ? `<div class="bank-semester">${escapeHtml(bank.semester)}</div>` : ''}
                         <div class="bank-meta">
-                            导入时间: ${bank.import_time} | 源文件: ${bank.source_file}
+                            导入时间: ${escapeHtml(bank.import_time)} | 源文件: ${escapeHtml(bank.source_file)}
                         </div>
                     </div>
                     <div class="bank-stats">
                         <span class="bank-count">${bank.question_count} 题</span>
                         <div class="bank-actions">
-                            <button class="btn btn-secondary btn-small" onclick="browseBank('${bank.name}')">
+                            <button class="btn btn-secondary btn-small" onclick="browseBank('${escapeAttr(bank.name)}')">
                                 <i class="fas fa-eye"></i> 查看
                             </button>
-                            <button class="btn btn-danger btn-small" onclick="confirmDeleteBank('${bank.name}')">
+                            <button class="btn btn-danger btn-small" onclick="confirmDeleteBank('${escapeAttr(bank.name)}')">
                                 <i class="fas fa-trash"></i> 删除
                             </button>
                         </div>
@@ -1312,7 +1359,14 @@ function updateTimer() {
         clearInterval(practiceTimer);
         practiceTimer = null;
         showToast('时间到！', 'warning');
-        showPracticeResult();
+        // 模拟考试模式：先判分再显示结果，避免全部按未作答处理
+        if (isExamMode) {
+            calculateExamResults().then(() => {
+                showPracticeResult();
+            });
+        } else {
+            showPracticeResult();
+        }
     }
 }
 
@@ -1674,8 +1728,8 @@ async function calculateExamResults() {
         const correctAnswer = question.shuffledAnswer || question.answer || [];
         
         if (result.answered && result.userAnswer.length > 0) {
-            // 判断答案是否正确
-            const isCorrect = arraysEqual(result.userAnswer.sort(), correctAnswer.sort());
+            // 判断答案是否正确（复制后再排序，避免原地排序污染原数组）
+            const isCorrect = arraysEqual([...result.userAnswer].sort(), [...correctAnswer].sort());
             result.isCorrect = isCorrect;
             result.correctAnswer = correctAnswer;
             
@@ -2070,6 +2124,11 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// 转义用于内联 onclick 属性中的字符串（防止引号破坏属性与注入）
+function escapeAttr(text) {
+    return escapeHtml(String(text)).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+}
+
 // ==================== 做题模式切换 ====================
 function onPracticeModeChange() {
     const mode = document.getElementById('practice-mode').value;
@@ -2223,17 +2282,18 @@ async function startWrongPractice() {
     const bank = document.getElementById('practice-bank').value;
     const singleCount = parseInt(document.getElementById('practice-single-count').value) || 0;
     const multiCount = parseInt(document.getElementById('practice-multi-count').value) || 0;
+    const judgeCount = parseInt(document.getElementById('practice-judge-count').value) || 0;
     const shuffleOptionsEnabled = document.getElementById('shuffle-options')?.checked || false;
     const enableTimer = document.getElementById('enable-timer').checked;
     const timeMinutes = parseInt(document.getElementById('practice-time').value) || 30;
     
-    if (singleCount === 0 && multiCount === 0) {
+    if (singleCount === 0 && multiCount === 0 && judgeCount === 0) {
         showToast('请至少设置一种题型的数量', 'warning');
         return;
     }
     
     try {
-        const filters = { single_count: singleCount, multi_count: multiCount };
+        const filters = { single_count: singleCount, multi_count: multiCount, judge_count: judgeCount };
         if (bank) filters.bank = bank;
         
         const data = await window.storageService.getPracticeWrong(filters);
@@ -2254,7 +2314,7 @@ async function startWrongPractice() {
             
             lastPracticeSettings = { 
                 bank, chapter: '', 
-                singleCount, multiCount, 
+                singleCount, multiCount, judgeCount,
                 enableTimer, timeMinutes, 
                 examMode: false, shuffleOptionsEnabled,
                 mode: 'wrong'
@@ -2349,19 +2409,19 @@ async function loadWrongBanks() {
         if (data.success && Object.keys(data.stats).length > 0) {
             bankList.innerHTML = Object.entries(data.stats).map(([bankName, stats]) => `
                 <div class="bank-card">
-                    <div class="bank-info" onclick="browseWrongBank('${bankName}')">
-                        <div class="bank-name">${bankName}</div>
+                    <div class="bank-info" onclick="browseWrongBank('${escapeAttr(bankName)}')">
+                        <div class="bank-name">${escapeHtml(bankName)}</div>
                         <div class="bank-meta">
-                            单选: ${stats.single}题 | 多选: ${stats.multi}题
+                            单选: ${stats.single}题 | 多选: ${stats.multi}题 | 判断: ${stats.judge || 0}题
                         </div>
                     </div>
                     <div class="bank-stats">
                         <span class="bank-count wrong-count-badge">${stats.total} 道错题</span>
                         <div class="bank-actions">
-                            <button class="btn btn-secondary btn-small" onclick="browseWrongBank('${bankName}')">
+                            <button class="btn btn-secondary btn-small" onclick="browseWrongBank('${escapeAttr(bankName)}')">
                                 <i class="fas fa-eye"></i> 查看
                             </button>
-                            <button class="btn btn-danger btn-small" onclick="confirmClearWrongBank('${bankName}')">
+                            <button class="btn btn-danger btn-small" onclick="confirmClearWrongBank('${escapeAttr(bankName)}')">
                                 <i class="fas fa-trash"></i> 清空
                             </button>
                         </div>
@@ -2414,15 +2474,15 @@ async function loadWrongQuestions(bankName) {
                             ${getTypeLabel(q.type)}
                         </span>
                         <span class="question-id-badge" title="题目编号">#${q.id}</span>
-                        <span class="question-chapter">${q.chapter}</span>
+                        <span class="question-chapter">${escapeHtml(q.chapter)}</span>
                         <span class="wrong-count-badge" style="margin-left: auto;">错${q.wrong_count || 1}次</span>
                     </div>
-                    <div class="question-content">${index + 1}. ${q.question}</div>
+                    <div class="question-content">${index + 1}. ${escapeHtml(q.question)}</div>
                     <div class="question-options">
                         ${Object.entries(q.options || {}).map(([key, value]) => {
                             const isCorrect = q.answer.includes(key) ? 'correct-answer' : '';
                             const isWrong = (q.last_wrong_answer || []).includes(key) && !q.answer.includes(key) ? 'wrong-answer' : '';
-                            return `<div class="option-item ${isCorrect} ${isWrong}">${key}. ${value}</div>`;
+                            return `<div class="option-item ${isCorrect} ${isWrong}">${escapeHtml(key)}. ${escapeHtml(value)}</div>`;
                         }).join('')}
                     </div>
                     <div class="question-answer">
