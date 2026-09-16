@@ -51,7 +51,7 @@ body {
     font-family: var(--font-main);
     background-color: #f0f0f8;
     background-image:
-        url('../img/deco/bg_light.png'),
+        url('/img/deco/bg_light.png'),
         linear-gradient(45deg, rgba(0,192,195,0.24) 25%, transparent 25%, transparent 75%, rgba(0,192,195,0.24) 75%),
         linear-gradient(45deg, rgba(0,192,195,0.24) 25%, transparent 25%, transparent 75%, rgba(0,192,195,0.24) 75%),
         linear-gradient(rgba(255,99,93,0.18) 1px, transparent 1px),
@@ -192,7 +192,7 @@ body {
 .hero-title::before {
     content: ''; position: absolute; top: -44px; left: 50%; transform: translateX(-50%);
     width: 40px; height: 40px;
-    background: url('../img/deco/title_sun-r.webp') no-repeat center center / contain;
+    background: url('/img/deco/title_sun-r.webp') no-repeat center center / contain;
     animation: sunRotate 20s linear infinite; opacity: 1;
 }
 .hero-subtitle {
@@ -1795,7 +1795,7 @@ select.form-control {
 .section-deco-title::before {
     content: ''; position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
     width: clamp(40px, 5vw, 60px); height: clamp(40px, 5vw, 60px);
-    background: url('../img/deco/title_sun-r.webp') no-repeat center center / contain;
+    background: url('/img/deco/title_sun-r.webp') no-repeat center center / contain;
     animation: sunRotate 20s linear infinite; opacity: 1;
 }
 .deco-title-line {
@@ -2125,7 +2125,7 @@ select.form-control {
 }
 .site-footer .footer-fence-wrap {
     width: 100%; height: 60px; background: transparent;
-    background-image: url('../img/deco/deco_fence.svg');
+    background-image: url('/img/deco/deco_fence.svg');
     background-repeat: repeat-x;
     background-size: auto 60px;
     background-position: center;
@@ -2235,7 +2235,7 @@ select.form-control {
 .gnav-menu-btn {
     position: fixed; top: 15px; right: 15px; z-index: 9999;
     width: 80px; height: 80px;
-    background: url('../img/deco/menu_bg.svg') no-repeat center center / contain;
+    background: url('/img/deco/menu_bg.svg') no-repeat center center / contain;
     cursor: pointer; display: none;
     border: none; padding: 0;
 }

@@ -49,7 +49,35 @@
             const chapter = filters.chapter;
             let questions = bankName ? Questions.getByBank(bankName) : Questions.getAllQuestions();
             if (chapter && chapter !== 'all' && chapter !== '') questions = questions.filter(q => q.chapter === chapter);
+            if (filters.type && filters.type !== 'all') questions = questions.filter(q => q.type === filters.type);
             return { success: true, questions };
+        },
+        async getQuestion(id) {
+            await this.ensureLoaded();
+            const question = Questions.getAllQuestions().find(q => q.id === id);
+            return question ? {success:true, question} : {success:false, error:'题目不存在'};
+        },
+        async updateQuestion(id, changes) {
+            return this.mutateQuestion(id, changes);
+        },
+        async deleteQuestion(id) {
+            return this.mutateQuestion(id, null);
+        },
+        async mutateQuestion(id, changes) {
+            await this.ensureLoaded();
+            const next = structuredClone(Questions._data);
+            let found = false;
+            for (const bank of Object.values(next.banks)) {
+                const index = bank.questions.findIndex(q => q.id === id);
+                if (index < 0) continue;
+                found = true;
+                if (changes) Object.assign(bank.questions[index], changes, {id});
+                else bank.questions.splice(index, 1);
+            }
+            if (!found) return {success:false, error:'题目不存在'};
+            if (!Storage.setQuestions(next)) return {success:false, error:'存储失败，原题库未改变'};
+            Questions._data = next;
+            return {success:true};
         },
         async getPracticeRandom(filters) {
             await this.ensureLoaded();
@@ -80,16 +108,38 @@
             return { success: true, questions: [...singles, ...multis, ...judges], total: singles.length + multis.length + judges.length };
         },
         async getPracticeWrong(filters) {
-            const bankName = filters.bank;
-            const wrongData = Wrongbook.getAll();
-            const bankWrong = wrongData.banks && wrongData.banks[bankName] ? wrongData.banks[bankName] : [];
-            return { success: true, questions: bankWrong };
+            const data = Wrongbook.getAll();
+            const entries = Object.entries(data.banks || {}).filter(([name]) => !filters.bank || name === filters.bank);
+            const questions = entries.flatMap(([bank, list]) => list.map(q => ({...q, bank})));
+            const selected = [];
+            for (const type of ['single', 'multi', 'judge']) {
+                const pool = questions.filter(q => q.type === type);
+                for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+                const count = Math.max(0, Number(filters[type + '_count']) || 0);
+                selected.push(...pool.slice(0, count));
+            }
+            return {success:true, questions:selected};
         },
-        async deleteBank(bankName) { return { success: true }; },
-        async importQuestions(bankName, questions) { return { success: true }; },
+        async deleteBank(bankName) {
+            await this.ensureLoaded();
+            const next = structuredClone(Questions._data);
+            delete next.banks[bankName];
+            if (!Storage.setQuestions(next)) return {success:false, error:'存储空间不足，删除未保存'};
+            Questions._data = next;
+            return {success:true};
+        },
+        async importQuestions(bankName, questions) {
+            await this.ensureLoaded();
+            const next = structuredClone(Questions._data);
+            const batch = questions.map((q, i) => ({...q, bank:bankName, id:'local_' + crypto.randomUUID()}));
+            next.banks[bankName] = {questions:batch, chapters:[...new Set(batch.map(q => q.chapter))], import_time:new Date().toLocaleString(), source_file:'本地导入'};
+            if (!Storage.setQuestions(next)) return {success:false, error:'浏览器存储空间不足，原题库未改变'};
+            Questions._data = next;
+            return {success:true, count:batch.length};
+        },
         async getConfig() { return Storage.getSettings(); },
         async saveConfig(config) { Storage.setSettings(config); return { success: true }; },
-        async clearAllCacheData() { localStorage.clear(); return { success: true }; },
+        async clearAllCacheData() { ['RANKINGS','WRONGBOOK','PROGRESS','PLAYER_NAME'].forEach(key => localStorage.removeItem(Storage.KEYS[key])); return { success: true }; },
         async getRankings() {
             const data = Rankings.getAll();
             const rankings = (data.rankings || []).map(r => ({ name: r.playerName || r.name || '匿名', total: r.totalCount || r.total || 0, correct: r.correctCount || r.correct || 0, wrong: (r.totalCount || r.total || 0) - (r.correctCount || r.correct || 0), accuracy: r.accuracy || 0, time_spent: r.duration || r.time_spent || 0, time_display: r.timeDisplay || r.time_display || '', date: r.createTime || r.date || new Date().toISOString() }));
@@ -100,9 +150,9 @@
         async getWrongbookStats() { return { success: true, stats: Wrongbook.getStats() }; },
         async getWrongBook(bankName) {
             const data = Wrongbook.getAll();
-            return { success: true, questions: data.banks && data.banks[bankName] ? data.banks[bankName] : [] };
+            return { success: true, questions: (data.banks?.[bankName] || []).map(q => ({...q, bank:bankName, last_wrong_answer:q.userAnswer || [], wrong_count:q.wrongCount || 1})) };
         },
-        async addWrongQuestion(question) { Wrongbook.add(question.question, question.userAnswer); return { success: true }; },
+        async addWrongQuestion(question) { await this.ensureLoaded(); const q = Questions.getAllQuestions().find(q => q.id === question.question_id); if (!q) return {success:false,error:'题目不存在'}; Wrongbook.add(q, question.user_answer || []); return { success: true }; },
         async removeWrongQuestion(questionId) {
             const data = Wrongbook.getAll();
             for (const [bankName, questions] of Object.entries(data.banks || {})) {
@@ -148,34 +198,9 @@
     }
     
     function hideServerFeatures() {
-        document.querySelectorAll('.import-btn, [data-page="import"], [data-page="settings"]').forEach(el => {
-            el.style.display = 'none';
-        });
-
-        document.querySelectorAll('.btn-danger').forEach(el => {
-            if (el.textContent.includes('删除')) {
-                el.style.display = 'none';
-            }
-        });
-
-        document.querySelectorAll('[onclick]').forEach(el => {
-            var onclick = el.getAttribute('onclick') || '';
-            if (onclick.includes("switchPage('import')")) {
-                el.style.display = 'none';
-            }
-        });
-
-        var importPage = document.getElementById('import-page');
-        if (importPage) importPage.style.display = 'none';
-
-        var heroImportBtn = document.querySelector('.hero-actions .btn-glass');
-        if (heroImportBtn && heroImportBtn.textContent.includes('导入题库')) {
-            heroImportBtn.style.display = 'none';
-        }
-
         document.body.classList.add('static-mode');
     }
-    
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initStaticSite);
     } else {
@@ -199,7 +224,7 @@
     
     async function handleApiCall(url, options) {
         const method = options.method || 'GET';
-        const body = options.body ? JSON.parse(options.body) : null;
+        const body = typeof options.body === 'string' ? JSON.parse(options.body) : null;
         
         // 解析API路径
         const apiPath = url.replace(/^.*\/api/, '/api');

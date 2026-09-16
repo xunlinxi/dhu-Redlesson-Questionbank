@@ -44,6 +44,12 @@ from backend.routes import (
 # 创建Flask应用
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
+
+@app.errorhandler(413)
+def file_too_large(error):
+    return jsonify(success=False, error='文件超过 20 MB，请拆分后导入'), 413
+
 
 # 注册蓝图
 app.register_blueprint(config_bp)

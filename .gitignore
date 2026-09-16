@@ -96,3 +96,10 @@ platforms/web/__pycache__/
 platforms/web/backend/__pycache__/
 platforms/web/backend/routes/__pycache__/
 platforms/web/backend/models/__pycache__/
+
+!platforms/web/frontend/js/lib/
+!platforms/electron/frontend/js/lib/
+!platforms/web/static-site/js/lib/
+# Local verification artifacts
+test-environment/artifacts/
+

@@ -65,6 +65,7 @@ body.remote-mode .question-item .btn-danger { display: none !important; }
         overflow-x: hidden !important;
         width: 100% !important;
         max-width: 100vw !important;
+        background-attachment: scroll !important;
     }
 
     .app-wrapper, .main-content, .page, .manage-section, .question-browser, .bank-list {
@@ -196,14 +197,23 @@ body.remote-mode .question-item .btn-danger { display: none !important; }
     .settings-row-top, .settings-row-bottom { grid-template-columns: 1fr; gap: 12px; }
     .settings-card { padding: 16px; }
 
-    .question-card { padding: 16px; }
+    .question-card { padding: 16px; margin-bottom: 140px; }
     .question-header { flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
     .question-type { font-size: 11px; padding: 2px 6px; }
     .question-id-badge { font-size: 10px; }
     .question-chapter { font-size: 11px; }
-    .question-content { font-size: 15px; margin-bottom: 16px; }
-    .option-btn { padding: 12px 14px; font-size: 14px; }
+    .question-content { font-size: 15px; margin-bottom: 14px; }
+    .option-btn { padding: 4px 14px; font-size: 14px; }
     .option-key { width: 28px; height: 28px; font-size: 13px; }
+
+    .question-content.text-sm { font-size: 14px; line-height: 1.6; }
+    .question-content.text-xs { font-size: 13px; line-height: 1.5; }
+    .question-content.text-xxs { font-size: 12px; line-height: 1.4; }
+    .question-content.text-micro { font-size: 11px; line-height: 1.3; }
+
+    .option-text.text-sm { font-size: 13px; }
+    .option-text.text-xs { font-size: 12px; }
+    .option-text.text-xxs { font-size: 11px; }
 
     .practice-actions { flex-direction: column; gap: 8px; }
     .practice-actions .btn { width: 100%; justify-content: center; }

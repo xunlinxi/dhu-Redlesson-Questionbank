@@ -9,10 +9,8 @@ const Questions = {
     DATA_VERSION: 2,
 
     _isValidCache(cached) {
-        if (!cached || !cached.banks || Object.keys(cached.banks).length === 0) return false;
-        if (cached._version !== this.DATA_VERSION) return false;
-        const firstBank = Object.values(cached.banks)[0];
-        return firstBank && Array.isArray(firstBank.questions);
+        return !!(cached && cached.banks && cached._version === this.DATA_VERSION &&
+            Object.values(cached.banks).every(bank => Array.isArray(bank.questions)));
     },
 
     async init() {

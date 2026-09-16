@@ -3,13 +3,15 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>炸红题库</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Inter:wght@300;400;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/mobile.css">
+    <link rel="stylesheet" href="css/cosmic.css">
+    <meta name="theme-color" content="#091c29">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -60,19 +62,19 @@
                     <span>炸红题库</span>
                 </div>
                 <nav class="nav-links">
-                    <a class="nav-link active" data-page="dashboard">
+                    <a role="button" tabindex="0" class="nav-link active" data-page="dashboard">
                         <i class="fas fa-home"></i><span>首页</span>
                     </a>
-                    <a class="nav-link" data-page="import">
+                    <a role="button" tabindex="0" class="nav-link" data-page="import">
                         <i class="fas fa-upload"></i><span>导入</span>
                     </a>
-                    <a class="nav-link" data-page="manage">
+                    <a role="button" tabindex="0" class="nav-link" data-page="manage">
                         <i class="fas fa-database"></i><span>题库</span>
                     </a>
-                    <a class="nav-link" data-page="wrongbook">
+                    <a role="button" tabindex="0" class="nav-link" data-page="wrongbook">
                         <i class="fas fa-times-circle"></i><span>错题本</span>
                     </a>
-                    <a class="nav-link" data-page="practice">
+                    <a role="button" tabindex="0" class="nav-link" data-page="practice">
                         <i class="fas fa-pen"></i><span>刷题</span>
                     </a>
                 </nav>
@@ -81,30 +83,24 @@
 
         <main class="main-content">
             <div id="dashboard-page" class="page active">
-                <section class="hero-section">
-                    <div class="hero-badge">ONLINE STUDY PLATFORM</div>
-                    <div class="hero-visual">
-                        <div class="hero-visual-glow"></div>
-                        <div class="hero-visual-ring-outer"></div>
-                        <div class="hero-visual-ring"></div>
-                        <div class="hero-visual-icon"><i class="fas fa-book-open"></i></div>
+                <section class="hero-section" aria-labelledby="hero-heading">
+                    <div class="hero-copy">
+                        <div class="hero-eyebrow">DHU / KNOWLEDGE EXPLORATION</div>
+                        <h1 class="hero-title" id="hero-heading">让每一次练习<em>都有回响。</em></h1>
+                        <p class="hero-subtitle">从一道题开始，点亮你的知识宇宙。<br>习概 · 毛概 · 思修 · 近代史 · 马原，一站练习与复盘。</p>
+                        <div class="hero-actions">
+                            <button class="btn btn-primary" onclick="switchPage('practice')">开始刷题 <span aria-hidden="true">↗</span></button>
+                            <button class="btn btn-glass" onclick="switchPage('import')">导入题库 <span aria-hidden="true">＋</span></button>
+                        </div>
+                        <div class="hero-footnote"><span></span>每一小步，都离掌握更近一点</div>
                     </div>
-                    <h1 class="hero-title gradient-text-flow">炸红题库</h1>
-                    <p class="hero-subtitle">政治理论课程智能刷题系统 — 习概 / 毛概 / 思修 / 近代史</p>
-                    <div class="hero-actions">
-                        <button class="btn btn-primary btn-giant" onclick="switchPage('practice')">
-                            <i class="fas fa-play"></i> 开始刷题
-                        </button>
-                        <button class="btn btn-glass" onclick="switchPage('import')">
-                            <i class="fas fa-upload"></i> 导入题库
-                        </button>
-                    </div>
-                    <div class="hero-secondary-actions">
-                        <button class="btn btn-danger-solid btn-sm" onclick="confirmClearCache()">
-                            <img src="img/deco/character_changebtn.svg" style="width:16px;height:16px;animation:refreshSpin 3s linear infinite;vertical-align:middle;margin-right:4px"> 清空缓存
-                        </button>
+                    <div class="lunar-stage" aria-hidden="true">
+                        <div class="lunar-orbit"></div><div class="lunar-disc"></div>
+                        <div class="stage-cross">✧</div><div class="orbit-caption">EXPLORE · PRACTICE · GROW</div>
+                        <div class="study-ticket"><small>YOUR NEXT CHAPTER</small><strong>今天，也进步一点。</strong><span class="ticket-number">01</span></div>
                     </div>
                 </section>
+                <div class="section-kicker">YOUR KNOWLEDGE AT A GLANCE / 学习概览</div>
 
                 <section class="stats-strip stagger-in">
                     <div class="stat-pill glow-card">
@@ -127,6 +123,11 @@
                         <div class="stat-num" id="multi-count">0</div>
                         <div class="stat-tag">多选</div>
                     </div>
+                    <div class="stat-pill glow-card">
+                        <div class="stat-icon-sm purple"><i class="fas fa-balance-scale"></i></div>
+                        <div class="stat-num" id="judge-count">0</div>
+                        <div class="stat-tag">判断</div>
+                    </div>
                 </section>
 
                 <section class="bento-grid scroll-reveal">
@@ -138,7 +139,7 @@
                     <div class="bento-card" onclick="switchPage('import')" style="cursor:pointer">
                         <div class="bento-icon accent"><i class="fas fa-upload"></i></div>
                         <h3>导入题库</h3>
-                        <p>上传 TXT/DOC 文件</p>
+                        <p>TXT / DOCX，本地解析与导入</p>
                     </div>
                 </section>
 
@@ -242,10 +243,11 @@
                     <h1>导入题库</h1>
                 </div>
                 <div class="import-section import-section-centered">
-                    <div class="upload-area" id="upload-area">
+                    <div class="import-steps"><span><b>01</b>选择文件</span><span><b>02</b>填写题库名</span><span><b>03</b>导入并查看结果</span></div>
+                    <div class="upload-area" id="upload-area" role="button" tabindex="0" aria-label="选择题库文件">
                         <i class="fas fa-cloud-upload-alt"></i>
                         <p>拖拽文件到此处或点击上传</p>
-                        <p class="hint">支持 .txt、.doc、.docx 格式<br><small>推荐使用TXT格式避免Word自动编号问题</small></p>
+                        <p class="hint">支持 .txt、.doc、.docx 格式<br><small>支持 UTF-8 / GBK / UTF-16；离线端请将 DOC 另存为 DOCX。单文件不超过 20 MB。同名导入会替换原题库。</small></p>
                         <input type="file" id="file-input" accept=".txt,.doc,.docx" hidden>
                     </div>
                     <div class="import-form">
@@ -291,6 +293,7 @@
                                 <option value="">全部类型</option>
                                 <option value="single">单选题</option>
                                 <option value="multi">多选题</option>
+                                <option value="judge">判断题</option>
                             </select>
                             <select id="filter-chapter">
                                 <option value="">全部章节</option>
@@ -369,6 +372,10 @@
                                             <input type="number" id="practice-multi-count" class="form-control" value="20" min="0" max="500">
                                         </div>
                                         <div class="config-row">
+                                            <label>判断题数量</label>
+                                            <input type="number" id="practice-judge-count" class="form-control" value="10" min="0" max="500">
+                                        </div>
+                                        <div class="config-row">
                                             <label><input type="checkbox" id="shuffle-options" checked> 随机打乱选项</label>
                                         </div>
                                         <div class="config-row" id="shuffle-questions-row" style="display: none;">
@@ -393,6 +400,7 @@
                                     <div class="preview-content">
                                         <p>单选题可用: <span id="available-single">0</span> 道</p>
                                         <p>多选题可用: <span id="available-multi">0</span> 道</p>
+                                        <p>判断题可用: <span id="available-judge">0</span> 道</p>
                                     </div>
                                 </div>
                                 <div class="settings-card">
@@ -543,39 +551,9 @@
 
     <div class="toast-container" id="toast-container"></div>
 
-            <footer class="site-footer">
-                <div class="footer-fence-wrap"></div>
-                <div class="footer-body">
-                    <div class="footer-inner">
-                        <div class="footer-left">
-                            <div class="footer-logo">炸红题库</div>
-                            <div class="footer-social">
-                                <span class="footer-social-label">OFFICIAL</span>
-                                <a href="https://github.com/xunlinxi/dhu-Redlesson-Questionbank" target="_blank" rel="noopener"><i class="fab fa-github"></i></a>
-                                <a href="javascript:void(0)"><i class="fab fa-weixin"></i></a>
-                                <a href="javascript:void(0)"><i class="fab fa-qq"></i></a>
-                                <a href="javascript:void(0)"><i class="fab fa-weibo"></i></a>
-                            </div>
-                        </div>
-                        <div class="footer-right">
-                            <nav class="footer-nav">
-                                <span class="footer-nav-item">首页</span>
-                                <span class="footer-nav-item">刷题</span>
-                                <span class="footer-nav-item">错题本</span>
-                                <span class="footer-nav-item">导入</span>
-                                <span class="footer-nav-item">统计</span>
-                            </nav>
-                            <div class="footer-totop-col" onclick="window.scrollTo({top:0,behavior:'smooth'})">
-                                <div class="footer-totop-line"></div>
-                                <span class="footer-totop-text">TO TOP</span>
-                                <span class="footer-totop-dot"></span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="footer-bottom">
-                        <span>© 2025-2026 DHU 炸红题库. All rights reserved.</span>
-                    </div>
-                </div>
+            <footer class="study-footer">
+                <div><strong>炸红题库</strong><span>DHU / 每一小步，都算数。</span></div>
+                <button class="btn btn-ghost" onclick="window.scrollTo({top:0,behavior:'smooth'})">回到顶部 ↑</button>
             </footer>
         </div>
 
@@ -603,6 +581,7 @@
                     <select id="edit-type">
                         <option value="single">单选题</option>
                         <option value="multi">多选题</option>
+                        <option value="judge">判断题</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -632,7 +611,7 @@
     <script src="js/app.js"></script>
     <script src="js/mobile.js"></script>
 
-    <button class="gnav-menu-btn" id="gnavMenuBtn" onclick="toggleMobileMenu()">
+    <button aria-label="打开导航菜单" class="gnav-menu-btn" id="gnavMenuBtn" onclick="toggleMobileMenu()">
         <div class="menu-lines">
             <span></span><span></span><span></span>
         </div>

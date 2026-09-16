@@ -6,6 +6,7 @@
 
 import re
 import os
+import hashlib
 from datetime import datetime
 from docx import Document
 from collections import OrderedDict
@@ -197,6 +198,19 @@ class QuestionParser:
             r'^二[、\.\s\t]+多项选择题',
             r'^二[、\.\s\t]+多选题',
         ]
+        # 判断题标识
+        self.judge_choice_patterns = [
+            r'^判断题[:：]?\s*$',
+            r'^[一二三四五六七八九十][、\.．\s]\s*判断题[:：]?\s*$',
+            r'^三[、\.\s\t]+判断题',
+        ]
+        # 判断题答案模式: (对) (错) （对） （错） (正确) (错误) 等
+        self.judge_answer_patterns = [
+            (r'[（(]\s*(对|正确|√|✓|T|t|true)\s*[）)]', '对'),
+            (r'[（(]\s*(错|错误|×|✗|F|f|false)\s*[）)]', '错'),
+        ]
+        # 判断题独立答案行: 对、错、正确、错误 等单独占一行
+        self.judge_standalone_pattern = r'^\s*(对|错|正确|错误|√|✓|×|✗)\s*$'
         # 章节标识
         self.chapter_patterns = [
             r'^第[一二三四五六七八九十百千\d]+章',
@@ -207,7 +221,7 @@ class QuestionParser:
         
         # 答案提取模式 - 支持多种格式，包括字母间有空格的情况，支持 A-Z 选项
         self.answer_patterns = [
-            r'[（(]\s*([A-Za-zＡ-Ｚａ-ｚ](?:\s*[A-Za-zＡ-Ｚａ-ｚ])*)\s*[）)]',  # 括号内的字母（可能有空格分隔），支持全角
+            r'[（(]\s*([A-Ha-hＡ-Ｈａ-ｈ](?:[\s、,，]*[A-Ha-hＡ-Ｈａ-ｈ])*)\s*[）)]',  # 括号内的字母（可能有空格分隔），支持全角
             r'\?\s*([A-Za-zＡ-Ｚａ-ｚ]+)',  # 匹配 ?D 或 ?ABC 格式（问号后跟答案字母），忽略问号
             r'[（(]\s*([A-Za-zＡ-Ｚａ-ｚ]{2,})\s*$',  # 行尾有左括号和答案但没有右括号闭合（多选题跨行格式）
         ]
@@ -219,7 +233,7 @@ class QuestionParser:
         self.question_mark_answer_pattern = r'\?\s*[A-Za-zＡ-Ｚａ-ｚ]'
         
         # 独立答案行模式 - 如 "正确答案: A" 或 "答案: AB"
-        self.standalone_answer_pattern = r'(?:正确)?答案[:：]?\s*([A-Za-zＡ-Ｚａ-ｚ]+)'
+        self.standalone_answer_pattern = r'(?:正确|参考)?答案[:：]?\s*([A-Ha-hＡ-Ｈａ-ｈ](?:[\s、,，;；]*[A-Ha-hＡ-Ｈａ-ｈ])*)'
         
         # 选项模式 - 支持半角和全角字母，A-Z
         self.option_start_pattern = r'^([A-Za-zＡ-Ｚａ-ｚ])[\.、．\s]'
@@ -244,14 +258,15 @@ class QuestionParser:
     
     def read_docx(self, file_path):
         """读取.docx文件"""
+        # Read paragraphs and table cells in document order, including nested tables.
+        from docx.oxml.ns import qn
         doc = Document(file_path)
         lines = []
-        for para in doc.paragraphs:
-            text = para.text.strip()
-            if text:
-                lines.append(text)
-        return lines
-    
+        for paragraph in doc.element.body.iter(qn('w:p')):
+            text = ''.join(node.text or '' for node in paragraph.iter(qn('w:t')))
+            lines.extend(line.strip() for line in text.splitlines() if line.strip())
+        return self._split_embedded_questions(lines)
+
     def read_doc(self, file_path):
         """读取.doc文件（需要Windows和Word）"""
         if not HAS_WIN32COM:
@@ -261,12 +276,12 @@ class QuestionParser:
         pythoncom.CoInitialize()
         
         try:
-            word = win32com.client.Dispatch("Word.Application")
+            word = win32com.client.DispatchEx("Word.Application")
             word.Visible = False
             try:
-                doc = word.Documents.Open(file_path)
+                doc = word.Documents.Open(os.path.abspath(file_path), ReadOnly=True, AddToRecentFiles=False)
                 text = doc.Content.Text
-                doc.Close()
+                doc.Close(False)
                 lines = [line.strip() for line in text.split('\r') if line.strip()]
                 return lines
             finally:
@@ -288,17 +303,30 @@ class QuestionParser:
     
     def read_txt(self, file_path):
         """读取TXT文件"""
-        # 尝试不同编码
-        encodings = ['utf-8', 'gbk', 'gb2312', 'utf-16', 'ansi']
+        raw = open(file_path, 'rb').read()
+        encodings = ['utf-16'] if raw.startswith((b'\xff\xfe', b'\xfe\xff')) else ['utf-8-sig', 'gb18030']
         for encoding in encodings:
             try:
-                with open(file_path, 'r', encoding=encoding) as f:
-                    text = f.read()
-                lines = [line.strip() for line in text.split('\n') if line.strip()]
-                return lines
-            except (UnicodeDecodeError, UnicodeError):
+                text = raw.decode(encoding)
+                if '\x00' in text:
+                    raise ValueError('TXT 含有空字节，请另存为 UTF-8 或带 BOM 的 UTF-16')
+                return self._split_embedded_questions([line.strip() for line in text.splitlines() if line.strip()])
+            except UnicodeError:
                 continue
-        raise Exception("无法识别TXT文件编码")
+        raise ValueError('无法识别 TXT 编码，请另存为 UTF-8')
+
+    def _split_embedded_questions(self, lines):
+        """拆分选项中嵌入了下一道题的行"""
+        fixed = []
+        for line in lines:
+            # 检测行尾是否嵌入了题目（编号+答案标记），且行首包含选项字母
+            m = re.search(r'\s+(\d{2,4})[、．\.]\s*.*?[（(]\s*[A-Za-z]+\s*[）)]\s*$', line)
+            if m and re.search(r'^[A-Fa-f][.．、]', line):
+                fixed.append(line[:m.start()].strip())
+                fixed.append(line[m.start():].lstrip())
+            else:
+                fixed.append(line)
+        return fixed
     
     def detect_question_type_line(self, text):
         """检测是否是题型标识行"""
@@ -309,6 +337,9 @@ class QuestionParser:
         for pattern in self.multi_choice_patterns:
             if re.match(pattern, text):
                 return 'multi'
+        for pattern in self.judge_choice_patterns:
+            if re.match(pattern, text):
+                return 'judge'
         return None
     
     def detect_chapter(self, text):
@@ -329,7 +360,7 @@ class QuestionParser:
             if matches:
                 # 取最后一个匹配的答案
                 # 清理空格和遗留的问号（Word 转 TXT 可能残留 ?）
-                answer_str = re.sub(r'[\s\?？]', '', matches[-1])
+                answer_str = re.sub(r'[\s\?？、,，;；]', '', matches[-1])
                 # 转换每个字母为标准格式
                 answer = []
                 for char in answer_str:
@@ -338,6 +369,25 @@ class QuestionParser:
                         answer.append(normalized)
                 return answer
         return []
+
+    def extract_judge_answer(self, text):
+        """从判断题文本中提取答案 返回 '对' 或 '错'"""
+        standalone = re.fullmatch(r'(?:(?:正确|参考)?答案\s*[:：]?\s*)?(对|错|正确|错误|√|✓|×|✗)', text.strip())
+        if standalone:
+            return '对' if standalone.group(1) in ('对', '正确', '√', '✓') else '错'
+        for pattern, answer_label in self.judge_answer_patterns:
+            m = re.search(pattern, text)
+            if m:
+                return answer_label
+        return None
+
+    def clean_judge_text(self, text):
+        """清理判断题文本，移除答案标记"""
+        cleaned = text
+        for pattern, _ in self.judge_answer_patterns:
+            cleaned = re.sub(pattern, '（  ）', cleaned, count=1)
+        cleaned = re.sub(self.question_number_pattern, '', cleaned)
+        return cleaned.strip()
     
     def has_answer_marker(self, text):
         """检查文本是否包含答案标记（包括空标记）"""
@@ -350,13 +400,17 @@ class QuestionParser:
         # 检查问号答案格式 ?D
         if re.search(self.question_mark_answer_pattern, text):
             return True
+        # 检查判断题答案标记
+        for pattern, _ in self.judge_answer_patterns:
+            if re.search(pattern, text):
+                return True
         return False
     
     def is_option_line(self, text):
         """判断是否是选项行（不含答案标记）"""
         text = text.strip()
         # 以选项字母开头（支持全角和半角），且不包含答案标记
-        if re.match(self.option_start_pattern, text):
+        if re.match(self.option_start_pattern, text) or re.match(r'^([A-Za-z])[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]', text):
             # 确保这不是一个题目行（题目行会包含答案标记）
             if not self.has_answer_marker(text):
                 # 检查选项内容是否有效（过滤如 "B. )" 这样的无效行）
@@ -442,24 +496,19 @@ class QuestionParser:
                             i = content_start
                             continue
                     
-                    # 情况3: 后面直接跟中文字符（如 "A高质量"、"D马克思"）
-                    elif '\u4e00' <= next_char <= '\u9fff':
-                        # 额外检查：前面应该是行首、空格、或其他选项的结尾（中文/标点）
-                        # 避免把 "ABCD" 这种答案字符串误识别
+                    # 情况3: 后面直接跟中文字符或中文标点（如 "A高质量"、"D马克思"、"D《中法"）
+                    elif '\u4e00' <= next_char <= '\u9fff' or '\u3000' <= next_char <= '\u303f' or '\uff00' <= next_char <= '\uffef':
+                        # 仅当字母位于行首或紧接分隔符（空格/标点）时才视为选项开头
+                        # 避免 "适用A国"、"B超" 等内容中的字母被误识别为选项
                         if i == 0 or text[i-1] in ' \t　.、．。）)':
-                            option_positions.append((i, normalized, i + 1))
-                            i += 1
-                            continue
-                        # 前面是中文也可以（如 "高速度C高水平"）
-                        elif '\u4e00' <= text[i-1] <= '\u9fff':
                             option_positions.append((i, normalized, i + 1))
                             i += 1
                             continue
                     
                     # 情况4: 后面直接跟数字（如 "D15"、"C12"）
                     elif next_char.isdigit():
-                        # 前面应该是空格、中文或标点
-                        if i == 0 or text[i-1] in ' \t　.、．。）)' or ('\u4e00' <= text[i-1] <= '\u9fff'):
+                        # 仅当字母位于行首或紧接分隔符时才视为选项开头
+                        if i == 0 or text[i-1] in ' \t　.、．。）)':
                             option_positions.append((i, normalized, i + 1))
                             i += 1
                             continue
@@ -480,6 +529,7 @@ class QuestionParser:
         
         # 如果上面的方法找到了至少2个选项，直接返回
         if len(options) >= 2:
+            self._clean_options_embedded_questions(options)
             return options
         
         # 备用方法: 使用正则匹配标准格式
@@ -501,8 +551,22 @@ class QuestionParser:
                 if value and not self.is_invalid_option_content(value):
                     options[key] = value
         
+        self._clean_options_embedded_questions(options)
         return options
     
+    def _clean_options_embedded_questions(self, options):
+        """清理选项值中嵌入的后续题目文本"""
+        if not options:
+            return
+        for key, value in list(options.items()):
+            if not value:
+                continue
+            # 检测选项值末尾是否嵌入了下一道题的编号+答案
+            # 如 "D. xxx 240、1945年学生发动...（ D ）"
+            m = re.search(r'\s*(\d{2,4})[、．\.]\s*[^\d].*?[（(]\s*[A-Za-z]+\s*[）)]\s*$', value)
+            if m:
+                options[key] = value[:m.start()].rstrip()
+
     def is_invalid_option_content(self, content):
         """检查选项内容是否无效（如纯括号、空白等）"""
         if not content:
@@ -702,6 +766,21 @@ class QuestionParser:
                     if re.match(self.question_number_pattern, next_line) and not self.is_option_line(next_line):
                         break
                     
+                    # 检查判断题独立答案行（优先于通用答案标记，避免 "（对）"、"（错）" 被误吞）
+                    if current_type == 'judge':
+                        judge_ans = self.extract_judge_answer(next_line)
+                        if judge_ans:
+                            answer_found = [judge_ans]
+                            has_standalone_answer = True
+                            # 如果答案行前面还有题干文字（如 "等思想观点（错）"），追加到题目行
+                            ans_pos = next_line.find('（') if '（' in next_line else next_line.find('(')
+                            if ans_pos > 0:
+                                prefix = next_line[:ans_pos].strip()
+                                if prefix and not re.match(r'^\s*(\d+)[、．.\s]', prefix):
+                                    question_lines.append(prefix)
+                            j += 1
+                            break
+                    
                     # 检查这行是否包含括号答案（且不是选项行）
                     if self.has_answer_marker(next_line) and not self.is_option_line(next_line):
                         # 这是题目的延续行，包含答案
@@ -716,7 +795,7 @@ class QuestionParser:
                         has_standalone_answer = True
                         answer_match = re.search(self.standalone_answer_pattern, next_line, re.IGNORECASE)
                         if answer_match:
-                            answer_str = answer_match.group(1).replace(' ', '')
+                            answer_str = re.sub(r'[\s、,，;；]', '', answer_match.group(1))
                             for char in answer_str:
                                 normalized = self.normalize_option_letter(char)
                                 if normalized and normalized not in answer_found:
@@ -766,37 +845,66 @@ class QuestionParser:
             
             # 检测题目行（包含答案标记的行）
             if self.has_answer_marker(line):
-                # 保存上一题（即使选项解析不全，也不丢题目）
+                # 判断是否为判断题
+                is_judge = current_type == 'judge' or (self.extract_judge_answer(line) is not None and not self.extract_answer(line))
+                
+                # 保存上一题
                 if current_question and (current_question.get('options') or current_question.get('question')):
                     questions.append(current_question)
                 
-                # 提取答案
-                answer = self.extract_answer(line)
-                # 清理题目文本
-                question_text = self.clean_question_text(line)
-                
-                current_question = {
-                    'chapter': current_chapter,
-                    'type': current_type,
-                    'question': question_text,
-                    'options': {},
-                    'answer': answer,
-                    'bank': bank_name
-                }
-                
-                # 检查题目行末尾是否有选项（如 "题目（ ）A. 选项A"）
-                opts = self.parse_options_from_line(line)
-                if opts:
-                    current_question['options'].update(opts)
+                if is_judge:
+                    answer = [self.extract_judge_answer(line)]
+                    # 如果该行纯粹是一个判断题答案标签（只有编号+答案，如"（对）""（错）"），
+                    # 且上一题还没有设置答案，则将答案补到上一题，不创建新题目
+                    is_pure_answer_line = re.match(r'^\s*[（(]\s*(对|错|正确|错误|√|×|T|F|true|false)\s*[）)]\s*$', line)
+                    if is_pure_answer_line and current_question and not current_question.get('answer'):
+                        current_question['answer'] = answer
+                        current_question['type'] = current_question.get('type') or 'judge'
+                        i += 1
+                        continue
+                    
+                    question_text = self.clean_judge_text(line)
+                    current_question = {
+                        'chapter': current_chapter,
+                        'type': 'judge',
+                        'question': question_text,
+                        'options': {},
+                        'answer': answer,
+                        'bank': bank_name
+                    }
+                else:
+                    answer = self.extract_answer(line)
+                    question_text = self.clean_question_text(line)
+                    current_question = {
+                        'chapter': current_chapter,
+                        'type': current_type,
+                        'question': question_text,
+                        'options': {},
+                        'answer': answer,
+                        'bank': bank_name
+                    }
+                    # 检查题目行末尾是否有选项
+                    opts = self.parse_options_from_line(line)
+                    if opts:
+                        current_question['options'].update(opts)
                 
                 i += 1
                 continue
+
+            # 检测判断题独立答案行（如单独一行的 "对"、"错"、"（对）"、"（错）"）
+            if current_question and not current_question.get('answer'):
+                judge_answer = self.extract_judge_answer(line)
+                if judge_answer:
+                    current_question['answer'] = [judge_answer]
+                    current_question['type'] = 'judge' if current_type == 'judge' else current_question.get('type', 'judge')
+                    i += 1
+                    continue
             
             # 检测独立答案行（如 "正确答案: A"）
             if current_question and not current_question.get('answer'):
                 answer_match = re.search(self.standalone_answer_pattern, line, re.IGNORECASE)
                 if answer_match:
-                    answer_str = answer_match.group(1).replace(' ', '')
+                    answer_str = re.sub(r'[\s、,，;；]', '', answer_match.group(1))
                     answer = []
                     for char in answer_str:
                         normalized = self.normalize_option_letter(char)
@@ -833,25 +941,31 @@ class QuestionParser:
         
         # 后处理 - 生成规范的题目编号
         for idx, q in enumerate(questions):
-            # 使用新的编号系统生成ID（带学期信息）
-            q['id'] = generate_question_id(bank_name or extracted_name, idx, year_code, semester_code)
-            # 保留旧ID作为备用（用于兼容已有数据）
+            q['id'] = generate_question_id(bank_name or extracted_name, idx, year_code, semester_code) + '-' + hashlib.sha256(bank_name.encode('utf-8')).hexdigest()[:12]
             q['legacy_id'] = f"{abs(hash(file_path))}_{idx}"
-            # 确保答案是列表
             if not q['answer']:
                 q['answer'] = []
-            # 根据答案数量自动判断题型
-            if len(q['answer']) > 1:
+            # 根据答案数量自动判断题型（判断题不参与此逻辑）
+            if q.get('type') != 'judge' and len(q['answer']) > 1:
                 q['type'] = 'multi'
         
         # 返回题目列表、题库名称和学期信息
-        return questions, extracted_name, semester_display
+        warnings = []
+        valid = []
+        for index, q in enumerate(questions, 1):
+            if (not q['answer'] or any(a is None for a in q['answer']) or
+                (q['type'] != 'judge' and (len(q['options']) < 2 or any(a not in q['options'] for a in q['answer'])))):
+                warnings.append(f"第 {index} 题「{q['question'][:25]}」缺少有效答案或完整选项，已跳过")
+            else:
+                valid.append(q)
+        return valid, extracted_name, semester_display, warnings
 
 
-def parse_file(file_path, bank_name=None):
+def parse_file(file_path, bank_name=None, with_warnings=False):
     """解析题库文件的便捷函数"""
     parser = QuestionParser()
-    return parser.parse_questions(file_path, bank_name)
+    result = parser.parse_questions(file_path, bank_name)
+    return result if with_warnings else result[:3]
 
 
 if __name__ == "__main__":

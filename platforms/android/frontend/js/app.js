@@ -18,6 +18,8 @@ let editingQuestionId = null;
 let serverOnline = true;
 let healthCheckInterval = null;
 let practiceTimer = null;
+let practiceFinishing = null;
+let practiceFinished = false;
 let remainingTime = 0;
 let practiceStartTime = null;
 let isExamMode = false;  // 模拟考试模式
@@ -49,8 +51,14 @@ function isMultiSelect(type) {
 
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', async function() {
+    initPageLoader();
     initNavigation();
     initUpload();
+    document.querySelectorAll('[role="button"]').forEach(element => {
+        element.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); element.click(); }
+        });
+    });
     initFeaturesCarousel();
 
     // Electron 环境特殊处理
@@ -59,10 +67,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         await loadStats();
     }
 
+    if (window.STATIC_MODE || window.storageService?.isMobile) {
+        await window.storageService.ready;
+        serverOnline = true;
+        await loadStats();
+        await loadBankChapters();
+    }
     await loadConfig();
 
     // Electron 环境不需要健康检查
-    if (!isElectron) {
+    if (!isElectron && !window.STATIC_MODE && !window.storageService?.isMobile) {
         startHealthCheck();
     }
 
@@ -347,7 +361,7 @@ async function loadBankChapters() {
             container.innerHTML = Object.entries(data.stats).map(([bankName, bankData]) => {
                 const chaptersHtml = Object.entries(bankData.chapters).map(([chapterName, count]) => `
                     <div class="chapter-item">
-                        <span class="chapter-name" title="${chapterName}">${chapterName}</span>
+                        <span class="chapter-name" title="${escapeHtml(chapterName)}">${escapeHtml(chapterName)}</span>
                         <span class="chapter-count">${count}题</span>
                     </div>
                 `).join('');
@@ -485,7 +499,11 @@ function handleFileSelectElectron(filePath, fileName) {
     console.log('💾 已设置 dataset.filePath:', fileInput.dataset.filePath);
 }
 
+let selectedImportFile = null;
+let importInFlight = false;
+
 function handleFileSelect(file) {
+    if (importInFlight) return;
     const allowedTypes = ['.txt', '.doc', '.docx'];
     const ext = '.' + file.name.split('.').pop().toLowerCase();
     
@@ -499,7 +517,7 @@ function handleFileSelect(file) {
     document.getElementById('import-btn').disabled = false;
     
     // 存储文件引用
-    document.getElementById('file-input').files = createFileList(file);
+    selectedImportFile = file;
 }
 
 function createFileList(file) {
@@ -509,6 +527,7 @@ function createFileList(file) {
 }
 
 function clearFile() {
+    selectedImportFile = null;
     document.getElementById('file-input').value = '';
     delete document.getElementById('file-input').dataset.filePath;
     document.getElementById('selected-file').style.display = 'none';
@@ -517,6 +536,8 @@ function clearFile() {
 }
 
 async function importFile() {
+    if (importInFlight) return;
+    importInFlight = true;
     const bankName = document.getElementById('bank-name').value.trim();
 
     console.log('📥 前端开始导入 - bankName:', bankName, 'isElectron:', isElectron);
@@ -541,23 +562,25 @@ async function importFile() {
                 document.getElementById('import-progress').style.display = 'none';
                 document.getElementById('import-btn').disabled = false;
                 showToast('请先选择文件', 'error');
+                importInFlight = false;
                 return; // 用户还没有选择文件
             }
 
             console.log('📤 调用 electronAPI.importQuestions - filePath:', filePath, 'bankName:', bankName);
             data = await window.electronAPI.importQuestions(filePath, bankName);
-        } else if (window.storageService && window.storageService.isMobile) {
+        } else if (window.storageService && (window.storageService.isMobile || window.STATIC_MODE)) {
             // Mobile 环境：本地解析
             const fileInput = document.getElementById('file-input');
-            if (!fileInput.files.length) {
+            if (!(selectedImportFile || fileInput.files[0])) {
                 showToast('请先选择文件', 'error');
                 document.getElementById('import-progress').style.display = 'none';
                 document.getElementById('import-btn').disabled = false;
+                importInFlight = false;
                 return;
             }
 
             try {
-                const file = fileInput.files[0];
+                const file = selectedImportFile || fileInput.files[0];
                 const effectiveBankName = bankName || file.name.replace(/\.[^/.]+$/, "");
                 const questions = await window.questionParser.parseFile(file);
 
@@ -565,7 +588,7 @@ async function importFile() {
 
                 const result = await window.storageService.importQuestions(effectiveBankName, questions);
                 if (result.success) {
-                    data = { success: true, message: `成功导入 ${result.count} 道题目` };
+                    data = { success: true, message: `成功导入 ${result.count} 道题目`, warnings: window.questionParser.warnings || [] };
                 } else {
                     data = { success: false, error: result.error };
                 }
@@ -578,15 +601,16 @@ async function importFile() {
             // Web 环境：使用文件上传
             const fileInput = document.getElementById('file-input');
 
-            if (!fileInput.files.length) {
+            if (!(selectedImportFile || fileInput.files[0])) {
                 showToast('请先选择文件', 'error');
                 document.getElementById('import-progress').style.display = 'none';
                 document.getElementById('import-btn').disabled = false;
+                importInFlight = false;
                 return;
             }
 
             const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+            formData.append('file', selectedImportFile || fileInput.files[0]);
             if (bankName) {
                 formData.append('bank_name', bankName);
             }
@@ -605,14 +629,15 @@ async function importFile() {
 
         if (data.success) {
             resultDiv.className = 'import-result success';
-            resultDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message}`;
+            resultDiv.textContent = data.message + (data.warnings?.length ? '\n跳过 ' + data.warnings.length + ' 道无法判分的题目：\n' + data.warnings.join('\n') : '');
             showToast(data.message, 'success');
             clearFile();
+            resultDiv.style.display = 'block';
             document.getElementById('bank-name').value = '';
             loadStats();
         } else {
             resultDiv.className = 'import-result error';
-            resultDiv.innerHTML = `<i class="fas fa-times-circle"></i> ${data.error}`;
+            resultDiv.textContent = data.error;
             showToast(data.error, 'error');
         }
     } catch (error) {
@@ -620,7 +645,8 @@ async function importFile() {
         showToast('导入失败: ' + error.message, 'error');
     }
 
-    document.getElementById('import-btn').disabled = false;
+    importInFlight = false;
+    document.getElementById('import-btn').disabled = !selectedImportFile && !document.getElementById('file-input').dataset.filePath && !document.getElementById('file-input').files.length;
 }
 
 // ==================== 题库管理 ====================
@@ -705,7 +731,7 @@ async function loadChapters(bankName) {
         
             if (data.success && Array.isArray(data.chapters)) {
                 data.chapters.forEach(chapter => {
-                    select.innerHTML += `<option value="${chapter}">${chapter}</option>`;
+                    select.innerHTML += `<option value="${escapeHtml(chapter).replace(/"/g, '&quot;')}">${escapeHtml(chapter)}</option>`;
                 });
             } else {
                 console.warn('loadPracticeChapters: 章节数据异常', data);
@@ -760,7 +786,7 @@ async function loadQuestions() {
                     <div class="question-content">${index + 1}. ${escapeHtml(q.question)}</div>
                     <div class="question-options">
                         ${visibleOptions.map(([key, value]) => `
-                            <div class="option-item">${escapeHtml(key)}. ${escapeHtml(value)}</div>
+                            <div class="option-item">${key}. ${escapeHtml(value)}</div>
                         `).join('')}
                     </div>
                     ${answerBlock}
@@ -814,10 +840,7 @@ function confirmDeleteQuestion(questionId) {
         '确定要删除这道题目吗？该操作不可恢复。',
         async () => {
             try {
-                const response = await fetch(`${API_BASE}/api/questions/${questionId}`, {
-                    method: 'DELETE'
-                });
-                const data = await response.json();
+                const data = await window.storageService.deleteQuestion(questionId);
                 
                 if (data.success) {
                     showToast('题目已删除', 'success');
@@ -835,8 +858,7 @@ function confirmDeleteQuestion(questionId) {
 
 async function editQuestion(questionId) {
     try {
-        const response = await fetch(`${API_BASE}/api/questions/${questionId}`);
-        const data = await response.json();
+        const data = await window.storageService.getQuestion(questionId);
         
         if (data.success) {
             const q = data.question;
@@ -883,18 +905,19 @@ async function saveQuestion() {
         question: document.getElementById('edit-question').value.trim(),
         type: document.getElementById('edit-type').value,
         options: options,
-        answer: document.getElementById('edit-answer').value.toUpperCase().split('').filter(ch => options[ch])
+        answer: window.questionParser.answer(document.getElementById('edit-answer').value, document.getElementById('edit-type').value === 'judge')
     };
     
+    if (!updateData.question || !updateData.answer.length ||
+        (updateData.type !== 'judge' && (Object.keys(options).length < 2 || updateData.answer.some(a => !options[a]))) ||
+        (updateData.type === 'judge' && !['对','错'].includes(updateData.answer[0]))) {
+        showToast('请填写题干、完整选项和有效答案；判断题使用对/错', 'warning'); return;
+    }
+    if (updateData.type === 'judge') updateData.options = {};
+
     try {
-        const response = await fetch(`${API_BASE}/api/questions/${editingQuestionId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData)
-        });
-        
-        const data = await response.json();
-        
+        const data = await window.storageService.updateQuestion(editingQuestionId, updateData);
+
         if (data.success) {
             showToast('题目已更新', 'success');
             closeEditModal();
@@ -914,7 +937,7 @@ function renderEditOptions() {
     optionsDiv.innerHTML = editOptionsState.map(item => `
         <div class="option-edit" data-key="${item.key}">
             <span>${item.key}.</span>
-            <input type="text" id="edit-option-${item.key}" value="${item.value || ''}" placeholder="选项${item.key}">
+            <input type="text" id="edit-option-${item.key}" value="${escapeHtml(item.value || '').replace(/"/g, '&quot;')}" placeholder="选项${item.key}">
             <button class="btn btn-danger btn-small" type="button" onclick="removeEditOption('${item.key}')">删除</button>
         </div>
     `).join('');
@@ -953,7 +976,7 @@ async function loadPracticeOptions() {
         
         if (data.success && Array.isArray(data.banks)) {
             data.banks.forEach(bank => {
-                select.innerHTML += `<option value="${bank.name}">${bank.name} (${bank.question_count}题)</option>`;
+                select.innerHTML += `<option value="${escapeHtml(bank.name).replace(/"/g, '&quot;')}">${escapeHtml(bank.name)} (${bank.question_count}题)</option>`;
             });
         } else {
             console.warn('loadPracticeOptions: 题库数据异常', data);
@@ -991,7 +1014,7 @@ async function loadPracticeChapters() {
             
             if (data.success) {
                 data.chapters.forEach(chapter => {
-                    select.innerHTML += `<option value="${chapter}">${chapter}</option>`;
+                    select.innerHTML += `<option value="${escapeHtml(chapter).replace(/"/g, '&quot;')}">${escapeHtml(chapter)}</option>`;
                 });
             }
         } catch (error) {
@@ -1071,7 +1094,7 @@ async function startPractice(examMode = false) {
     const timeMinutes = parseInt(document.getElementById('practice-time').value) || 35;
     const shuffleOptionsEnabled = document.getElementById('shuffle-options')?.checked || false;
     
-    if (singleCount === 0 && multiCount === 0 && judgeCount === 0) {
+    if ([singleCount, multiCount, judgeCount].some(n => n < 0) || singleCount + multiCount + judgeCount === 0) {
         showToast('请至少设置一种题型的数量', 'warning');
         return;
     }
@@ -1103,6 +1126,8 @@ async function startPractice(examMode = false) {
             wrongCount = 0;
             selectedAnswers = [];
             practiceStartTime = new Date();
+            practiceFinishing = null;
+            practiceFinished = false;
             isExamMode = examMode;
             navCurrentPage = 1; // 重置答题卡页码
             
@@ -1220,8 +1245,10 @@ function renderQuestionNav() {
     // 分离单选和多选题
     const singleQuestions = [];
     const multiQuestions = [];
+    const judgeQuestions = [];
     practiceQuestions.forEach((q, i) => {
-        if (q.type === 'multi') {
+        if (q.type === 'judge') { judgeQuestions.push({index:i, question:q});
+        } else if (q.type === 'multi') {
             multiQuestions.push({ index: i, question: q });
         } else {
             singleQuestions.push({ index: i, question: q });
@@ -1229,7 +1256,7 @@ function renderQuestionNav() {
     });
     
     // 合并所有题目用于分页
-    const allItems = [...singleQuestions, ...multiQuestions];
+    const allItems = [...singleQuestions, ...multiQuestions, ...judgeQuestions];
     const totalPages = Math.ceil(allItems.length / NAV_PAGE_SIZE);
     
     // 确保当前页码有效
@@ -1274,7 +1301,7 @@ function renderQuestionNav() {
     let currentSection = null;
     
     pageItems.forEach((item) => {
-        const itemType = item.question.type === 'multi' ? 'multi' : 'single';
+        const itemType = item.question.type;
         
         // 检查是否需要添加分组标题
         if (currentSection !== itemType) {
@@ -1285,7 +1312,7 @@ function renderQuestionNav() {
             
             // 开始新分组
             currentSection = itemType;
-            const totalCount = itemType === 'multi' ? multiQuestions.length : singleQuestions.length;
+            const totalCount = itemType === 'judge' ? judgeQuestions.length : itemType === 'multi' ? multiQuestions.length : singleQuestions.length;
             const title = getTypeLabel(itemType);
             html += `<div class="nav-section"><div class="nav-section-title ${itemType === 'multi' ? 'multi' : ''}">${title} (${totalCount}题)</div>`;
             html += '<div class="nav-section-grid">';
@@ -1359,14 +1386,7 @@ function updateTimer() {
         clearInterval(practiceTimer);
         practiceTimer = null;
         showToast('时间到！', 'warning');
-        // 模拟考试模式：先判分再显示结果，避免全部按未作答处理
-        if (isExamMode) {
-            calculateExamResults().then(() => {
-                showPracticeResult();
-            });
-        } else {
-            showPracticeResult();
-        }
+        finishPractice();
     }
 }
 
@@ -1456,7 +1476,7 @@ function renderQuestion() {
             const isSelected = selectedAnswers.includes(key) ? 'selected' : '';
             return `<button class="option-btn ${isSelected}" onclick="selectOption('${key}', ${isMultiSelect(question.type)})" data-key="${key}">
                 <span class="option-key">${key}</span>
-                <span class="option-text">${value}</span>
+                <span class="option-text">${escapeHtml(value)}</span>
             </button>`;
         }).join('');
         
@@ -1477,7 +1497,7 @@ function renderQuestion() {
             const isSelected = result.userAnswer.includes(key) ? 'selected' : '';
             return `<button class="option-btn ${isCorrect} ${isWrong} ${isSelected} disabled" data-key="${key}">
                 <span class="option-key">${key}</span>
-                <span class="option-text">${value}</span>
+                <span class="option-text">${escapeHtml(value)}</span>
             </button>`;
         }).join('');
         
@@ -1500,7 +1520,7 @@ function renderQuestion() {
         optionsList.innerHTML = optionEntries.map(([key, value]) => `
             <button class="option-btn" onclick="selectOption('${key}', ${isMultiSelect(question.type)})" data-key="${key}">
                 <span class="option-key">${key}</span>
-                <span class="option-text">${value}</span>
+                <span class="option-text">${escapeHtml(value)}</span>
             </button>
         `).join('');
         
@@ -1523,6 +1543,7 @@ function renderQuestion() {
 }
 
 function selectOption(key, isMulti) {
+    if (practiceFinishing || practiceFinished) return;
     const btn = document.querySelector(`.option-btn[data-key="${key}"]`);
     
     if (btn.classList.contains('disabled')) return;
@@ -1544,7 +1565,7 @@ function selectOption(key, isMulti) {
     }
     
     // 模拟考试模式：自动保存选择的答案（不判分）
-    if (isExamMode && selectedAnswers.length > 0) {
+    if (isExamMode) {
         saveExamAnswer();
     }
 }
@@ -1556,7 +1577,7 @@ function saveExamAnswer() {
     // 使用打乱后的答案（如果有）
     const correctAnswer = question.shuffledAnswer || question.answer || [];
     questionResults[currentQuestionIndex] = {
-        answered: true,
+        answered: selectedAnswers.length > 0,
         userAnswer: [...selectedAnswers],
         correctAnswer: correctAnswer,
         isCorrect: null  // 暂不判分
@@ -1566,48 +1587,23 @@ function saveExamAnswer() {
 
 // 洗牌函数：只打乱选项内容，保持ABCD顺序不变，同时返回答案映射
 function shuffleEntries(entries, originalAnswer) {
-    const keys = entries.map(([key]) => key).sort(); // 保持字母顺序 A, B, C, D...
-    const values = entries.map(([, value]) => value);
-    const originalKeys = entries.map(([key]) => key).sort();
-    
-    // 创建原始值到原始键的映射
-    const valueToOriginalKey = {};
-    entries.forEach(([key, value]) => {
-        valueToOriginalKey[value] = key;
-    });
-    
-    // 只打乱值
-    for (let i = values.length - 1; i > 0; i--) {
+    const keys = entries.map(([key]) => key).sort();
+    const shuffled = entries.map(entry => [...entry]);
+    for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [values[i], values[j]] = [values[j], values[i]];
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    
-    // 创建新键到值的映射，以及原始键到新键的映射
-    const newEntries = keys.map((key, idx) => [key, values[idx]]);
-    
-    // 创建答案映射：原始答案字母 -> 新答案字母
-    // 例如原本D是正确答案，D的内容现在在A位置，那么新答案就是A
-    const answerMap = {};
-    const reverseAnswerMap = {}; // 新选项 -> 原始选项（用于将用户选择转回原始选项）
-    newEntries.forEach(([newKey, value]) => {
-        const originalKey = valueToOriginalKey[value];
-        if (originalKey) {
-            answerMap[originalKey] = newKey;
-            reverseAnswerMap[newKey] = originalKey;
-        }
+    const answerMap = {}, reverseAnswerMap = {};
+    const result = shuffled.map(([originalKey, value], index) => {
+        answerMap[originalKey] = keys[index];
+        reverseAnswerMap[keys[index]] = originalKey;
+        return [keys[index], value];
     });
-    
-    // 转换正确答案
-    const shuffledAnswer = (originalAnswer || []).map(ans => answerMap[ans] || ans);
-    
-    return {
-        entries: newEntries,
-        shuffledAnswer: shuffledAnswer,
-        reverseAnswerMap: reverseAnswerMap // 添加反向映射
-    };
+    return {entries: result, shuffledAnswer: (originalAnswer || []).map(key => answerMap[key]), reverseAnswerMap};
 }
 
 async function submitAnswer() {
+    if (!isExamMode && questionResults[currentQuestionIndex]?.answered) return;
     if (selectedAnswers.length === 0) {
         showToast('请选择答案', 'warning');
         return;
@@ -1698,20 +1694,24 @@ function prevQuestion() {
 }
 
 function nextQuestion() {
+    if (practiceFinishing || practiceFinished) return;
     if (currentQuestionIndex < practiceQuestions.length - 1) {
         currentQuestionIndex++;
         renderQuestion();
     } else {
-        // 显示结果
-        if (isExamMode) {
-            // 模拟考试模式：先计算所有答案，等待错题添加完成后再显示结果
-            calculateExamResults().then(() => {
-                showPracticeResult();
-            });
-        } else {
-            showPracticeResult();
-        }
+        finishPractice();
     }
+}
+
+function finishPractice() {
+    if (practiceFinished) return Promise.resolve();
+    if (practiceFinishing) return practiceFinishing;
+    if (practiceTimer) { clearInterval(practiceTimer); practiceTimer = null; }
+    practiceFinishing = (async () => {
+        if (isExamMode) await calculateExamResults();
+        showPracticeResult();
+    })();
+    return practiceFinishing;
 }
 
 // 计算模拟考试结果 - 最终判分
@@ -1764,6 +1764,8 @@ function arraysEqual(a, b) {
 }
 
 function showPracticeResult() {
+    if (practiceFinished) return;
+    practiceFinished = true;
     // 停止计时器
     if (practiceTimer) {
         clearInterval(practiceTimer);
@@ -1866,7 +1868,7 @@ function showResultQuestion(index) {
         
         return `<div class="result-option ${classes.join(' ')}">
             <span class="result-option-key">${key}</span>
-            <span class="result-option-text">${value}</span>
+            <span class="result-option-text">${escapeHtml(value)}</span>
         </div>`;
     }).join('');
     
@@ -1877,9 +1879,9 @@ function showResultQuestion(index) {
         <div class="result-question-header">
             <span class="question-type ${getTypeClass(question.type)}">${typeText}</span>
             <span class="result-question-status ${statusClass}">${statusText}</span>
-            <span class="question-chapter">${question.chapter}</span>
+            <span class="question-chapter">${escapeHtml(question.chapter)}</span>
         </div>
-        <div class="result-question-content">${index + 1}. ${question.question}</div>
+        <div class="result-question-content">${index + 1}. ${escapeHtml(question.question)}</div>
         <div class="result-options-list">${optionsHtml}</div>
         <div class="result-answer-info">
             <span class="your-answer"><i class="fas fa-user"></i> 你的答案: ${userAnswerText}</span>
@@ -2126,7 +2128,8 @@ function escapeHtml(text) {
 
 // 转义用于内联 onclick 属性中的字符串（防止引号破坏属性与注入）
 function escapeAttr(text) {
-    return escapeHtml(String(text)).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+    const escaped = String(text).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+    return escapeHtml(escaped).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // ==================== 做题模式切换 ====================
@@ -2282,17 +2285,18 @@ async function startWrongPractice() {
     const bank = document.getElementById('practice-bank').value;
     const singleCount = parseInt(document.getElementById('practice-single-count').value) || 0;
     const multiCount = parseInt(document.getElementById('practice-multi-count').value) || 0;
+    const judgeCount = parseInt(document.getElementById('practice-judge-count').value) || 0;
     const shuffleOptionsEnabled = document.getElementById('shuffle-options')?.checked || false;
     const enableTimer = document.getElementById('enable-timer').checked;
     const timeMinutes = parseInt(document.getElementById('practice-time').value) || 30;
     
-    if (singleCount === 0 && multiCount === 0) {
+    if ([singleCount, multiCount, judgeCount].some(n => n < 0) || singleCount + multiCount + judgeCount === 0) {
         showToast('请至少设置一种题型的数量', 'warning');
         return;
     }
     
     try {
-        const filters = { single_count: singleCount, multi_count: multiCount };
+        const filters = { single_count: singleCount, multi_count: multiCount, judge_count: judgeCount };
         if (bank) filters.bank = bank;
         
         const data = await window.storageService.getPracticeWrong(filters);
@@ -2313,7 +2317,7 @@ async function startWrongPractice() {
             
             lastPracticeSettings = { 
                 bank, chapter: '', 
-                singleCount, multiCount, 
+                singleCount, multiCount, judgeCount,
                 enableTimer, timeMinutes, 
                 examMode: false, shuffleOptionsEnabled,
                 mode: 'wrong'
@@ -2335,6 +2339,8 @@ function initPracticeSession(enableTimer, timeMinutes, examMode) {
     wrongCount = 0;
     selectedAnswers = [];
     practiceStartTime = new Date();
+            practiceFinishing = null;
+            practiceFinished = false;
     isExamMode = examMode;
     navCurrentPage = 1; // 重置答题卡页码
     
@@ -2538,26 +2544,14 @@ function confirmClearWrongBank(bankName) {
         async () => {
             try {
                 let data;
-                if (isElectron) {
-                    // Electron 暂时不支持按题库清空，这里先模拟一下或者调用 clearWrongbook (清除所有)
-                    // 但正确的做法是在 preload/main 添加 clearWrongbookByBank
-                    // 目前暂用 clearWrongbook 代替，或者提示用户
-                    // 修正：我们应该添加 clearWrongbookByBank 到 Electron API
-                    // 暂时这里为了演示改用全部清空逻辑，或者简单实现
-                    // 由于时间关系，我们假设 main.js 只有 clearWrongbook，这里需要注意
-                    // 这里我们先跳过 Electron 实现，或者提示
-                    
-                    // 实际情况：需要 main.js 支持。如果不支持，暂时报错
-                    // 为了让功能可用，我们直接调用一个假设存在的接口，后续补上，或者暂时禁用
-                     showToast('Electron版暂不支持按题库清空，请手动删除', 'warning');
-                     return;
-                } else {
-                    const response = await fetch(`${API_BASE}/api/wrongbook/bank/${encodeURIComponent(bankName)}`, {
-                        method: 'DELETE'
-                    });
-                    data = await response.json();
+                const loaded = await window.storageService.getWrongBook(bankName);
+                if (!loaded.success) throw new Error(loaded.error);
+                for (const question of loaded.questions) {
+                    const removed = await window.storageService.removeWrongQuestion(question.id);
+                    if (!removed.success) throw new Error(removed.error);
                 }
-                
+                data = {success:true, message:'此题库错题已清空'};
+
                 if (data.success) {
                     showToast(data.message, 'success');
                     loadWrongBanks();
@@ -2763,6 +2757,8 @@ async function loadProgress(progressId) {
             isExamMode = progress.mode === 'exam';
             remainingTime = progress.remaining_time || 0;
             practiceStartTime = new Date();
+            practiceFinishing = null;
+            practiceFinished = false;
             navCurrentPage = 1; // 重置答题卡页码
             
             // 恢复进度ID和已用时间（用于覆盖保存和计算总用时）
@@ -2850,7 +2846,7 @@ async function deleteProgress(progressId, silent = false) {
 // ==================== 动画系统 ====================
 function initAnimations() {
     initPageLoader();
-    initParticles();
+    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) initParticles();
     initScrollReveal();
     initMouseGlow();
     initButtonRipple();

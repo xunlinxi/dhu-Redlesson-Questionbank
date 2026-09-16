@@ -10,6 +10,15 @@ from backend.models.wrongbook import WrongbookModel
 practice_bp = Blueprint('practice', __name__)
 
 
+@practice_bp.before_request
+def validate_counts():
+    for key in ('count', 'single_count', 'multi_count', 'judge_count'):
+        value = request.args.get(key)
+        if value not in (None, ''):
+            if not value.isascii() or not value.isdigit() or len(value) > 6:
+                return jsonify(success=False, error=f'{key} 必须为非负整数（最多六位）'), 400
+
+
 @practice_bp.route('/api/practice/random', methods=['GET'])
 def get_random_questions():
     """获取随机题目用于刷题

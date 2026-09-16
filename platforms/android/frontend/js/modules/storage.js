@@ -12,7 +12,7 @@ class StorageService {
 
         if (this.isMobile) {
             this.initDexie();
-            setTimeout(() => this._ensurePresetData(), 200);
+            this.ready = window.Capacitor ? this._ensurePresetData() : Promise.resolve();
         }
     }
 
@@ -103,12 +103,11 @@ class StorageService {
             return await window.electronAPI.practiceRandom(params);
         } else if (this.isMobile) {
             try {
-                let questions;
-                if (params.bank) {
-                    questions = await this.db.questions.where('bank').equals(params.bank).toArray();
-                } else {
-                    questions = await this.db.questions.toArray();
-                }
+                // 未指定题库时查询全部题目
+                let collection = params.bank
+                    ? this.db.questions.where('bank').equals(params.bank)
+                    : this.db.questions;
+                let questions = await collection.toArray();
 
                 if (params.chapter && params.chapter !== 'all') {
                     questions = questions.filter(q => q.chapter === params.chapter);
@@ -158,12 +157,10 @@ class StorageService {
             return await window.electronAPI.practiceSequence(params);
         } else if (this.isMobile) {
             try {
-                let questions;
-                if (params.bank) {
-                    questions = await this.db.questions.where('bank').equals(params.bank).toArray();
-                } else {
-                    questions = await this.db.questions.toArray();
-                }
+                // 未指定题库时查询全部题目
+                let questions = params.bank
+                    ? await this.db.questions.where('bank').equals(params.bank).toArray()
+                    : await this.db.questions.toArray();
                 
                 if (params.chapter && params.chapter !== 'all') {
                     questions = questions.filter(q => q.chapter === params.chapter);
@@ -193,12 +190,10 @@ class StorageService {
             return await window.electronAPI.practiceWrong(params);
         } else if (this.isMobile) {
             try {
-                let wrongEntries;
-                if (params.bank) {
-                    wrongEntries = await this.db.wrongbook.where('bank').equals(params.bank).toArray();
-                } else {
-                    wrongEntries = await this.db.wrongbook.toArray();
-                }
+                // 未指定题库时查询全部错题
+                const wrongEntries = params.bank
+                    ? await this.db.wrongbook.where('bank').equals(params.bank).toArray()
+                    : await this.db.wrongbook.toArray();
                 const questionIds = wrongEntries.map(w => w.question_id);
                 
                 let questions = await this.db.questions.where('id').anyOf(questionIds).toArray();
@@ -346,17 +341,13 @@ class StorageService {
     
     // ================== 题目管理 ==================
 
-    async getQuestions(filters) {
+    async getQuestions(filters = {}) {
         if (this.isElectron) {
             return await window.electronAPI.getQuestions(filters);
         } else if (this.isMobile) {
             try {
-                let questions;
-                if (filters.bank) {
-                    questions = await this.db.questions.where('bank').equals(filters.bank).toArray();
-                } else {
-                    questions = await this.db.questions.toArray();
-                }
+                let collection = filters.bank ? this.db.questions.where('bank').equals(filters.bank) : this.db.questions;
+                let questions = await collection.toArray();
                 
                 if (filters.chapter && filters.chapter !== 'all') {
                     questions = questions.filter(q => q.chapter === filters.chapter);
@@ -370,7 +361,7 @@ class StorageService {
                 return { success: false, error: error.message };
             }
         } else {
-            let url = `/api/questions?bank=${encodeURIComponent(filters.bank)}`;
+            let url = `/api/questions?bank=${encodeURIComponent(filters.bank || '')}`;
             if (filters.type) url += `&type=${filters.type}`;
             if (filters.chapter) url += `&chapter=${encodeURIComponent(filters.chapter)}`;
             const response = await fetch(url);
@@ -732,6 +723,8 @@ class StorageService {
         
         try {
             const result = await this.db.transaction('rw', this.db.banks, this.db.questions, async () => {
+                // Same-name imports replace questions atomically, consistent with Web/Electron.
+                await this.db.questions.where('bank').equals(bankName).delete();
                 // 1. 记录 Bank
                 const existing = await this.db.banks.where('name').equals(bankName).first();
                 if (!existing) {

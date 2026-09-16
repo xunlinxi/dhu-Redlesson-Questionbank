@@ -53,7 +53,7 @@ def parse_document(file_path):
     返回: {questions, bank_name, semester}
     """
     try:
-        result = parse_file(file_path, None)
+        result = parse_file(file_path, None, with_warnings=True)
         questions = result[0]
         bank_name = result[1]
         semester = result[2] if len(result) > 2 else ""
@@ -63,6 +63,7 @@ def parse_document(file_path):
             "questions": questions,
             "bank_name": bank_name,
             "semester": semester,
+            "warnings": result[3] if len(result) > 3 else [],
         }
     except Exception as e:
         return {"success": False, "error": str(e)}

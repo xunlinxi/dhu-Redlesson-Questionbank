@@ -12,6 +12,7 @@ class StorageService {
 
         if (this.isMobile) {
             this.initDexie();
+            this.ready = window.Capacitor ? this._ensurePresetData() : Promise.resolve();
         }
     }
 
@@ -340,12 +341,12 @@ class StorageService {
     
     // ================== 题目管理 ==================
 
-    async getQuestions(filters) {
+    async getQuestions(filters = {}) {
         if (this.isElectron) {
             return await window.electronAPI.getQuestions(filters);
         } else if (this.isMobile) {
             try {
-                let collection = this.db.questions.where('bank').equals(filters.bank);
+                let collection = filters.bank ? this.db.questions.where('bank').equals(filters.bank) : this.db.questions;
                 let questions = await collection.toArray();
                 
                 if (filters.chapter && filters.chapter !== 'all') {
@@ -360,7 +361,7 @@ class StorageService {
                 return { success: false, error: error.message };
             }
         } else {
-            let url = `/api/questions?bank=${encodeURIComponent(filters.bank)}`;
+            let url = `/api/questions?bank=${encodeURIComponent(filters.bank || '')}`;
             if (filters.type) url += `&type=${filters.type}`;
             if (filters.chapter) url += `&chapter=${encodeURIComponent(filters.chapter)}`;
             const response = await fetch(url);
@@ -674,12 +675,56 @@ class StorageService {
         return array;
     }
 
+    async _ensurePresetData() {
+        try {
+            const count = await this.db.banks.count();
+            if (count > 0) {
+                console.log('已有题库数据，跳过预设导入 (banks: ' + count + ')');
+                return;
+            }
+            console.log('首次启动，正在导入预设题库...');
+            const response = await fetch('./data/preset.json');
+            if (!response.ok) {
+                console.warn('预设题库文件不存在或加载失败');
+                return;
+            }
+            const data = await response.json();
+            const banks = data.banks;
+            if (!banks) {
+                console.warn('预设题库数据格式无效');
+                return;
+            }
+            let totalImported = 0;
+            for (const [bankName, bankData] of Object.entries(banks)) {
+                const questions = bankData.questions || [];
+                if (questions.length > 0) {
+                    await this.db.transaction('rw', this.db.banks, this.db.questions, async () => {
+                        await this.db.banks.add({ name: bankName, uploadDate: new Date() });
+                        const batch = questions.map((q, idx) => ({
+                            ...q,
+                            bank: bankName,
+                            id: q.id || ('preset_' + bankName + '_' + idx)
+                        }));
+                        await this.db.questions.bulkAdd(batch);
+                    });
+                    totalImported += questions.length;
+                    console.log('导入题库: ' + bankName + ' (' + questions.length + '题)');
+                }
+            }
+            console.log('预设题库导入完成，共导入 ' + totalImported + ' 题');
+        } catch (error) {
+            console.error('预设题库导入失败:', error);
+        }
+    }
+
     // 导入数据辅助方法 (供 Parser 调用)
     async importQuestions(bankName, questions) {
         if (!this.isMobile) return { success: false, error: "Not in mobile mode" };
         
         try {
             const result = await this.db.transaction('rw', this.db.banks, this.db.questions, async () => {
+                // Same-name imports replace questions atomically, consistent with Web/Electron.
+                await this.db.questions.where('bank').equals(bankName).delete();
                 // 1. 记录 Bank
                 const existing = await this.db.banks.where('name').equals(bankName).first();
                 if (!existing) {

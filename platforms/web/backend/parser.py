@@ -6,6 +6,7 @@
 
 import re
 import os
+import hashlib
 from datetime import datetime
 from docx import Document
 from collections import OrderedDict
@@ -220,7 +221,7 @@ class QuestionParser:
         
         # 答案提取模式 - 支持多种格式，包括字母间有空格的情况，支持 A-Z 选项
         self.answer_patterns = [
-            r'[（(]\s*([A-Za-zＡ-Ｚａ-ｚ](?:\s*[A-Za-zＡ-Ｚａ-ｚ])*)\s*[）)]',  # 括号内的字母（可能有空格分隔），支持全角
+            r'[（(]\s*([A-Ha-hＡ-Ｈａ-ｈ](?:[\s、,，]*[A-Ha-hＡ-Ｈａ-ｈ])*)\s*[）)]',  # 括号内的字母（可能有空格分隔），支持全角
             r'\?\s*([A-Za-zＡ-Ｚａ-ｚ]+)',  # 匹配 ?D 或 ?ABC 格式（问号后跟答案字母），忽略问号
             r'[（(]\s*([A-Za-zＡ-Ｚａ-ｚ]{2,})\s*$',  # 行尾有左括号和答案但没有右括号闭合（多选题跨行格式）
         ]
@@ -232,7 +233,7 @@ class QuestionParser:
         self.question_mark_answer_pattern = r'\?\s*[A-Za-zＡ-Ｚａ-ｚ]'
         
         # 独立答案行模式 - 如 "正确答案: A" 或 "答案: AB"
-        self.standalone_answer_pattern = r'(?:正确)?答案[:：]?\s*([A-Za-zＡ-Ｚａ-ｚ]+)'
+        self.standalone_answer_pattern = r'(?:正确|参考)?答案[:：]?\s*([A-Ha-hＡ-Ｈａ-ｈ](?:[\s、,，;；]*[A-Ha-hＡ-Ｈａ-ｈ])*)'
         
         # 选项模式 - 支持半角和全角字母，A-Z
         self.option_start_pattern = r'^([A-Za-zＡ-Ｚａ-ｚ])[\.、．\s]'
@@ -257,14 +258,15 @@ class QuestionParser:
     
     def read_docx(self, file_path):
         """读取.docx文件"""
+        # Read paragraphs and table cells in document order, including nested tables.
+        from docx.oxml.ns import qn
         doc = Document(file_path)
         lines = []
-        for para in doc.paragraphs:
-            text = para.text.strip()
-            if text:
-                lines.append(text)
-        return lines
-    
+        for paragraph in doc.element.body.iter(qn('w:p')):
+            text = ''.join(node.text or '' for node in paragraph.iter(qn('w:t')))
+            lines.extend(line.strip() for line in text.splitlines() if line.strip())
+        return self._split_embedded_questions(lines)
+
     def read_doc(self, file_path):
         """读取.doc文件（需要Windows和Word）"""
         if not HAS_WIN32COM:
@@ -274,12 +276,12 @@ class QuestionParser:
         pythoncom.CoInitialize()
         
         try:
-            word = win32com.client.Dispatch("Word.Application")
+            word = win32com.client.DispatchEx("Word.Application")
             word.Visible = False
             try:
-                doc = word.Documents.Open(file_path)
+                doc = word.Documents.Open(os.path.abspath(file_path), ReadOnly=True, AddToRecentFiles=False)
                 text = doc.Content.Text
-                doc.Close()
+                doc.Close(False)
                 lines = [line.strip() for line in text.split('\r') if line.strip()]
                 return lines
             finally:
@@ -301,19 +303,17 @@ class QuestionParser:
     
     def read_txt(self, file_path):
         """读取TXT文件"""
-        # 尝试不同编码
-        encodings = ['utf-8', 'gbk', 'gb2312', 'utf-16', 'ansi']
+        raw = open(file_path, 'rb').read()
+        encodings = ['utf-16'] if raw.startswith((b'\xff\xfe', b'\xfe\xff')) else ['utf-8-sig', 'gb18030']
         for encoding in encodings:
             try:
-                with open(file_path, 'r', encoding=encoding) as f:
-                    text = f.read()
-                lines = [line.strip() for line in text.split('\n') if line.strip()]
-                # 预处理：拆分选项行中嵌入的下一题
-                lines = self._split_embedded_questions(lines)
-                return lines
-            except (UnicodeDecodeError, UnicodeError):
+                text = raw.decode(encoding)
+                if '\x00' in text:
+                    raise ValueError('TXT 含有空字节，请另存为 UTF-8 或带 BOM 的 UTF-16')
+                return self._split_embedded_questions([line.strip() for line in text.splitlines() if line.strip()])
+            except UnicodeError:
                 continue
-        raise Exception("无法识别TXT文件编码")
+        raise ValueError('无法识别 TXT 编码，请另存为 UTF-8')
 
     def _split_embedded_questions(self, lines):
         """拆分选项中嵌入了下一道题的行"""
@@ -360,7 +360,7 @@ class QuestionParser:
             if matches:
                 # 取最后一个匹配的答案
                 # 清理空格和遗留的问号（Word 转 TXT 可能残留 ?）
-                answer_str = re.sub(r'[\s\?？]', '', matches[-1])
+                answer_str = re.sub(r'[\s\?？、,，;；]', '', matches[-1])
                 # 转换每个字母为标准格式
                 answer = []
                 for char in answer_str:
@@ -372,6 +372,9 @@ class QuestionParser:
 
     def extract_judge_answer(self, text):
         """从判断题文本中提取答案 返回 '对' 或 '错'"""
+        standalone = re.fullmatch(r'(?:(?:正确|参考)?答案\s*[:：]?\s*)?(对|错|正确|错误|√|✓|×|✗)', text.strip())
+        if standalone:
+            return '对' if standalone.group(1) in ('对', '正确', '√', '✓') else '错'
         for pattern, answer_label in self.judge_answer_patterns:
             m = re.search(pattern, text)
             if m:
@@ -792,7 +795,7 @@ class QuestionParser:
                         has_standalone_answer = True
                         answer_match = re.search(self.standalone_answer_pattern, next_line, re.IGNORECASE)
                         if answer_match:
-                            answer_str = answer_match.group(1).replace(' ', '')
+                            answer_str = re.sub(r'[\s、,，;；]', '', answer_match.group(1))
                             for char in answer_str:
                                 normalized = self.normalize_option_letter(char)
                                 if normalized and normalized not in answer_found:
@@ -901,7 +904,7 @@ class QuestionParser:
             if current_question and not current_question.get('answer'):
                 answer_match = re.search(self.standalone_answer_pattern, line, re.IGNORECASE)
                 if answer_match:
-                    answer_str = answer_match.group(1).replace(' ', '')
+                    answer_str = re.sub(r'[\s、,，;；]', '', answer_match.group(1))
                     answer = []
                     for char in answer_str:
                         normalized = self.normalize_option_letter(char)
@@ -938,7 +941,7 @@ class QuestionParser:
         
         # 后处理 - 生成规范的题目编号
         for idx, q in enumerate(questions):
-            q['id'] = generate_question_id(bank_name or extracted_name, idx, year_code, semester_code)
+            q['id'] = generate_question_id(bank_name or extracted_name, idx, year_code, semester_code) + '-' + hashlib.sha256(bank_name.encode('utf-8')).hexdigest()[:12]
             q['legacy_id'] = f"{abs(hash(file_path))}_{idx}"
             if not q['answer']:
                 q['answer'] = []
@@ -947,13 +950,22 @@ class QuestionParser:
                 q['type'] = 'multi'
         
         # 返回题目列表、题库名称和学期信息
-        return questions, extracted_name, semester_display
+        warnings = []
+        valid = []
+        for index, q in enumerate(questions, 1):
+            if (not q['answer'] or any(a is None for a in q['answer']) or
+                (q['type'] != 'judge' and (len(q['options']) < 2 or any(a not in q['options'] for a in q['answer'])))):
+                warnings.append(f"第 {index} 题「{q['question'][:25]}」缺少有效答案或完整选项，已跳过")
+            else:
+                valid.append(q)
+        return valid, extracted_name, semester_display, warnings
 
 
-def parse_file(file_path, bank_name=None):
+def parse_file(file_path, bank_name=None, with_warnings=False):
     """解析题库文件的便捷函数"""
     parser = QuestionParser()
-    return parser.parse_questions(file_path, bank_name)
+    result = parser.parse_questions(file_path, bank_name)
+    return result if with_warnings else result[:3]
 
 
 if __name__ == "__main__":

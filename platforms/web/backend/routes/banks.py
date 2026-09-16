@@ -3,6 +3,8 @@
 """
 
 import os
+import tempfile
+import shutil
 import unicodedata
 import re as regex
 from datetime import datetime
@@ -53,7 +55,7 @@ def import_questions():
         }), 400
     
     file = request.files['file']
-    bank_name = request.form.get('bank_name', '')
+    bank_name = request.form.get('bank_name', '').strip()
     
     if file.filename == '':
         return jsonify({
@@ -67,6 +69,7 @@ def import_questions():
             "error": "不支持的文件格式，请上传 .txt、.doc 或 .docx 文件"
         }), 400
     
+    temporary_dir = None
     try:
         original_filename = file.filename
         ext = os.path.splitext(original_filename)[1].lower()
@@ -79,17 +82,17 @@ def import_questions():
         if not safe_filename or safe_filename.startswith('.'):
             safe_filename = f"upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
         
-        file_path = os.path.join(UPLOAD_FOLDER, safe_filename)
+        temporary_dir = tempfile.mkdtemp(prefix='import-', dir=UPLOAD_FOLDER)
+        file_path = os.path.join(temporary_dir, safe_filename)
         file.save(file_path)
         
         txt_file_path = file_path
         
         # 如果是 doc/docx，先转换为 txt
-        if ext in ['.doc', '.docx']:
-            txt_file_path = convert_word_to_txt(file_path)
+        # Parser reads Word directly so table cells are not lost during conversion.
         
         # 解析题目（返回三个值：题目列表、题库名称、学期信息）
-        parse_result = parse_file(txt_file_path, bank_name if bank_name else None)
+        parse_result = parse_file(txt_file_path, bank_name if bank_name else None, with_warnings=True)
         questions = parse_result[0]
         extracted_name = parse_result[1]
         semester_display = parse_result[2] if len(parse_result) > 2 else ''
@@ -134,7 +137,8 @@ def import_questions():
         return jsonify({
             "success": True,
             "message": f"成功导入 {len(questions)} 道题目到题库 '{bank_name}'",
-            "question_count": len(questions)
+            "question_count": len(questions),
+            "warnings": parse_result[3] if len(parse_result) > 3 else []
         })
     
     except Exception as e:
@@ -142,3 +146,7 @@ def import_questions():
             "success": False,
             "error": f"导入失败: {str(e)}"
         }), 500
+
+    finally:
+        if temporary_dir:
+            shutil.rmtree(temporary_dir, ignore_errors=True)

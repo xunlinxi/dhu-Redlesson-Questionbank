@@ -21,21 +21,6 @@ window.addEventListener('load', function() {
     }, 100);
 });
 
-// 禁止双指缩放
-document.addEventListener('gesturestart', function(e) {
-    e.preventDefault();
-});
-
-// 禁止双击缩放
-var lastTouchEnd = 0;
-document.addEventListener('touchend', function(e) {
-    var now = Date.now();
-    if (now - lastTouchEnd <= 300) {
-        e.preventDefault();
-    }
-    lastTouchEnd = now;
-}, { passive: false });
-
 function initMobile() {
     // 1. 检测客户端类型
     checkClientType();
@@ -49,7 +34,7 @@ function initMobile() {
 // 检测是否为本地客户端
 function checkClientType() {
     // Electron 环境始终是本地客户端
-    if (window.electronAPI !== undefined) {
+    if (window.electronAPI !== undefined || window.STATIC_MODE || window.Capacitor) {
         isLocalClient = true;
         return;
     }

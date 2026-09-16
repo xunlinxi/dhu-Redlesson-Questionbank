@@ -845,12 +845,15 @@ ipcMain.handle('import-questions', async (event, filePath, bankName) => {
         // 使用 Python 解析器
         const parseResult = await parseWithPython(filePath);
 
-        if (!parseResult.success) {
-            return { success: false, error: parseResult.error };
+        if (!parseResult.success || !parseResult.questions?.length) {
+            return { success: false, error: parseResult.error || "未解析到有效题目，原题库未改变" };
         }
 
         // 保存到数据文件
-        const bankNameToUse = bankName || parseResult.bank_name;
+        const bankNameToUse = (bankName || '').trim() || parseResult.bank_name;
+        // Namespace IDs by the effective user-selected bank name as well.
+        const namespace = require('crypto').createHash('sha256').update(bankNameToUse).digest('hex').slice(0, 12);
+        parseResult.questions.forEach(q => { q.id = String(q.id).replace(/-[a-f0-9]{12}$/, '') + '-' + namespace; });
 
         // 添加题库信息
         QuestionsModel.addBank(
@@ -869,7 +872,8 @@ ipcMain.handle('import-questions', async (event, filePath, bankName) => {
         return {
             success: true,
             message: `成功导入 ${parseResult.questions.length} 道题目到题库 '${bankNameToUse}'`,
-            question_count: parseResult.questions.length
+            question_count: parseResult.questions.length,
+            warnings: parseResult.warnings || []
         };
     } catch (error) {
         console.error('❌ 导入失败:', error);
