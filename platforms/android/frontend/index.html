@@ -5,15 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>炸红题库</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Inter:wght@300;400;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/mobile.css">
     <link rel="stylesheet" href="css/cosmic.css">
+    <link rel="stylesheet" href="css/editorial.css">
     <meta name="theme-color" content="#091c29">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
 </head>
 
 <body>
@@ -25,35 +22,6 @@
         </div>
     </div>
 
-    <div class="particles-bg" id="particlesBg"></div>
-    <div class="aurora-bg">
-        <div class="aurora-layer aurora-layer-1"></div>
-        <div class="aurora-layer aurora-layer-2"></div>
-        <div class="aurora-layer aurora-layer-3"></div>
-        <div class="aurora-layer aurora-layer-4"></div>
-        <div class="aurora-layer aurora-layer-5"></div>
-    </div>
-    <div class="mouse-glow" id="mouseGlow"></div>
-    <div class="deco-circle deco-circle-1"></div>
-    <div class="deco-circle deco-circle-2"></div>
-    <div class="deco-circle deco-circle-3"></div>
-    <div class="deco-ring deco-ring-1"></div>
-    <div class="deco-ring deco-ring-2"></div>
-    <div class="deco-star deco-star-1"></div>
-    <div class="deco-star deco-star-2"></div>
-    <div class="deco-star deco-star-3"></div>
-    <div class="deco-diamond deco-diamond-1"></div>
-    <div class="deco-diamond deco-diamond-2"></div>
-    <div class="deco-diamond deco-diamond-3"></div>
-    <div class="neon-line neon-line-1"></div>
-    <div class="neon-line neon-line-2"></div>
-    <img class="deco-neon deco-neon-octopus" src="img/deco/deco_neon-octopus.png" alt="">
-    <img class="deco-neon deco-neon-fish" src="img/deco/deco_neon-fish.png" alt="">
-    <img class="deco-neon deco-neon-cloud1" src="img/deco/deco_neon-cloud1.png" alt="">
-    <img class="deco-neon deco-neon-cloud2" src="img/deco/deco_neon-cloud2.png" alt="">
-    <img class="deco-neon deco-cloud1" src="img/deco/deco_cloud.png" alt="">
-    <img class="deco-neon deco-cloud2" src="img/deco/deco_cloud.png" alt="">
-
     <div class="app-wrapper">
         <header class="top-nav" id="topNav">
             <div class="nav-inner">
@@ -61,7 +29,7 @@
                     <i class="fas fa-book-open"></i>
                     <span>炸红题库</span>
                 </div>
-                <nav class="nav-links">
+                <nav class="nav-links" id="primary-navigation" aria-label="主导航">
                     <a role="button" tabindex="0" class="nav-link active" data-page="dashboard">
                         <i class="fas fa-home"></i><span>首页</span>
                     </a>
@@ -77,13 +45,14 @@
                     <a role="button" tabindex="0" class="nav-link" data-page="practice">
                         <i class="fas fa-pen"></i><span>刷题</span>
                     </a>
+                    <button class="nav-position-reset" type="button" onclick="resetMobileMenuPosition()">↺ 重置导航位置</button>
                 </nav>
             </div>
         </header>
 
         <main class="main-content">
             <div id="dashboard-page" class="page active">
-                <section class="hero-section" aria-labelledby="hero-heading">
+                <div class="night-opening">                <section class="hero-section" aria-labelledby="hero-heading">
                     <div class="hero-copy">
                         <div class="hero-eyebrow">DHU / KNOWLEDGE EXPLORATION</div>
                         <h1 class="hero-title" id="hero-heading">让每一次练习<em>都有回响。</em></h1>
@@ -95,14 +64,15 @@
                         <div class="hero-footnote"><span></span>每一小步，都离掌握更近一点</div>
                     </div>
                     <div class="lunar-stage" aria-hidden="true">
-                        <div class="lunar-orbit"></div><div class="lunar-disc"></div>
-                        <div class="stage-cross">✧</div><div class="orbit-caption">EXPLORE · PRACTICE · GROW</div>
+                        <img class="lunar-art" src="img/illustrations/study-moon.svg" width="480" height="480" alt="" fetchpriority="high">
+                        <div class="orbit-caption">EXPLORE · PRACTICE · GROW</div>
                         <div class="study-ticket"><small>YOUR NEXT CHAPTER</small><strong>今天，也进步一点。</strong><span class="ticket-number">01</span></div>
                     </div>
                 </section>
-                <div class="section-kicker">YOUR KNOWLEDGE AT A GLANCE / 学习概览</div>
-
-                <section class="stats-strip stagger-in">
+</div>
+                <section class="paper-band" id="features-section"><div class="section-inner"><div class="chapter-heading"><span class="chapter-number">01 / DHU STUDY</span><h2><span>FEATURES</span><strong>功能特色</strong></h2><p>从整理资料到完成复盘，找到适合自己的学习方式。</p></div><div class="portal-grid"><button type="button" class="portal-card" onclick="switchPage('practice')"><div class="portal-visual"><span class="portal-number">01</span><img src="img/illustrations/feature-practice.svg" width="288" height="240" alt="" loading="lazy"></div><div class="portal-copy"><span class="portal-tag">4 种练习模式</span><h3>按自己的节奏练习</h3><p>随机、顺序、模拟考试，从熟悉知识到检验掌握。</p><span class="portal-link">开始练习<span aria-hidden="true">↗</span></span></div></button><button type="button" class="portal-card" onclick="switchPage('import')"><div class="portal-visual"><span class="portal-number">02</span><img src="img/illustrations/feature-import.svg" width="288" height="240" alt="" loading="lazy"></div><div class="portal-copy"><span class="portal-tag">多格式导入</span><h3>把题库装进口袋</h3><p>导入 TXT 与 Word 文档，把复习资料整理成可练习的题目。</p><span class="portal-link">导入题库<span aria-hidden="true">↗</span></span></div></button><button type="button" class="portal-card" onclick="switchPage('wrongbook')"><div class="portal-visual"><span class="portal-number">03</span><img src="img/illustrations/feature-review.svg" width="288" height="240" alt="" loading="lazy"></div><div class="portal-copy"><span class="portal-tag">专注查漏补缺</span><h3>让错题成为线索</h3><p>保留薄弱知识点，再练一次，让每次复盘都有收获。</p><span class="portal-link">打开错题本<span aria-hidden="true">↗</span></span></div></button></div></div></section>
+                <section class="study-interlude"><div><span>SMALL STEPS, REAL PROGRESS</span><h2>练习 · 复盘 · 再出发</h2><p>不用一次记住所有。把每一道题，变成下一次的底气。</p></div><div class="interlude-orbit" aria-hidden="true"><span>知</span></div></section>
+                <section class="paper-band library-band"><div class="section-inner"><div class="chapter-heading"><span class="chapter-number">02 / DHU STUDY</span><h2><span>YOUR LIBRARY</span><strong>学习概览</strong></h2><p>题库、章节与错题，在这里一目了然。</p></div>                <section class="stats-strip stagger-in">
                     <div class="stat-pill glow-card">
                         <div class="stat-icon-sm"><i class="fas fa-database"></i></div>
                         <div class="stat-num" id="total-banks">0</div>
@@ -127,19 +97,6 @@
                         <div class="stat-icon-sm purple"><i class="fas fa-balance-scale"></i></div>
                         <div class="stat-num" id="judge-count">0</div>
                         <div class="stat-tag">判断</div>
-                    </div>
-                </section>
-
-                <section class="bento-grid scroll-reveal">
-                    <div class="bento-card bento-wide shimmer" onclick="switchPage('practice')" style="cursor:pointer">
-                        <div class="bento-icon"><i class="fas fa-pen"></i></div>
-                        <h3>开始练习</h3>
-                        <p>选择题库和模式，开始答题</p>
-                    </div>
-                    <div class="bento-card" onclick="switchPage('import')" style="cursor:pointer">
-                        <div class="bento-icon accent"><i class="fas fa-upload"></i></div>
-                        <h3>导入题库</h3>
-                        <p>TXT / DOCX，本地解析与导入</p>
                     </div>
                 </section>
 
@@ -174,65 +131,7 @@
                     </div>
                 </section>
 
-                <section class="section-deco-title scroll-reveal" data-reveal-delay="200">
-                    <div class="deco-wave-wrap">
-                        <svg viewBox="0 0 200 12" fill="none" preserveAspectRatio="none">
-                            <path d="M0 6 C20 2 40 10 60 6 C80 2 100 10 120 6 C140 2 160 10 180 6 L200 6" stroke="#00c0c3" stroke-width="1" opacity="0.3"/>
-                        </svg>
-                    </div>
-                    <img class="deco-coin" src="img/deco/title_coin.png" alt="">
-                    <span class="neon-text">FEATURES</span>
-                    <span class="deco-title-sub">功能特色</span>
-                    <img class="deco-coin" src="img/deco/title_coin.png" alt="">
-                    <div class="deco-wave-wrap">
-                        <svg viewBox="0 0 200 12" fill="none" preserveAspectRatio="none">
-                            <path d="M0 6 C20 10 40 2 60 6 C80 10 100 2 120 6 C140 10 160 2 180 6 L200 6" stroke="#ff635d" stroke-width="1" opacity="0.3"/>
-                        </svg>
-                    </div>
-                </section>
-                <section class="features-carousel scroll-reveal" data-reveal-delay="300">
-                    <div class="features-cards-wrap" id="featuresCardsWrap">
-                        <div class="features-cards-track" id="featuresCardsTrack">
-                            <div class="feature-card" data-color="cyan">
-                                <div class="feature-icon"><i class="fas fa-bolt"></i></div>
-                                <h4>智能刷题</h4>
-                                <p>支持随机、顺序、考试、错题四种模式</p>
-                            </div>
-                            <div class="feature-card" data-color="orange">
-                                <div class="feature-icon"><i class="fas fa-file-import"></i></div>
-                                <h4>多格式导入</h4>
-                                <p>支持 TXT、DOC、DOCX 格式题库文件</p>
-                            </div>
-                            <div class="feature-card" data-color="green">
-                                <div class="feature-icon"><i class="fas fa-chart-bar"></i></div>
-                                <h4>成绩统计</h4>
-                                <p>实时记录正确率和用时，排行榜激励</p>
-                            </div>
-                            <div class="feature-card" data-color="salmon">
-                                <div class="feature-icon"><i class="fas fa-save"></i></div>
-                                <h4>进度保存</h4>
-                                <p>随时保存做题进度，下次继续练习</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="features-swiper-nav">
-                        <button class="carousel-btn prev" id="featurePrev" onclick="scrollFeatures(-1)">
-                            <span class="carousel-btn-arrow"><img src="img/deco/character_arrow.svg" alt=""></span>
-                            <span class="carousel-btn-label">PREV</span>
-                        </button>
-                        <button class="carousel-btn next" id="featureNext" onclick="scrollFeatures(1)">
-                            <span class="carousel-btn-arrow"><img src="img/deco/character_arrow.svg" alt=""></span>
-                            <span class="carousel-btn-label">NEXT</span>
-                        </button>
-                    </div>
-                    <div class="features-umbrellas">
-                        <img class="umbrella-item" src="img/deco/deco_umbrella1.svg" alt="">
-                        <img class="umbrella-item" src="img/deco/deco_umbrella2.svg" alt="">
-                        <img class="umbrella-item" src="img/deco/deco_umbrella3.svg" alt="">
-                        <img class="umbrella-item" src="img/deco/deco_umbrella4.svg" alt="">
-                    </div>
-                </section>
-
+</div></section>
             </div>
 
             <div id="import-page" class="page">
@@ -240,9 +139,9 @@
                     <button class="btn btn-ghost" onclick="switchPage('dashboard')">
                         <i class="fas fa-arrow-left"></i> 首页
                     </button>
-                    <h1>导入题库</h1>
+                    <h1 data-heading="IMPORT">导入题库</h1>
                 </div>
-                <div class="import-section import-section-centered">
+                <div class="import-layout"><div class="import-section import-section-centered">
                     <div class="import-steps"><span><b>01</b>选择文件</span><span><b>02</b>填写题库名</span><span><b>03</b>导入并查看结果</span></div>
                     <div class="upload-area" id="upload-area" role="button" tabindex="0" aria-label="选择题库文件">
                         <i class="fas fa-cloud-upload-alt"></i>
@@ -270,6 +169,19 @@
                     </div>
                     <div class="import-result" id="import-result" style="display: none;"></div>
                 </div>
+                    <aside class="import-guide"><span class="guide-label">FORMAT NOTES / 格式参考</span><h2>整理好格式，<br>导入更顺利。</h2><div class="sample-sheet"><div><span class="file-dot"></span> 我的题库.txt</div><pre>一、单项选择题
+1、题目内容（A）
+A. 选项一
+B. 选项二
+
+二、多项选择题
+2、题目内容
+A. 选项一
+B. 选项二
+答案：AB
+
+三、判断题
+3、判断内容（对）</pre></div><p>也支持“答案：A”单独一行。旧版 DOC 在离线端请先另存为 DOCX 或 TXT。</p></aside></div>
             </div>
 
             <div id="manage-page" class="page">
@@ -277,7 +189,7 @@
                     <button class="btn btn-ghost" onclick="switchPage('dashboard')">
                         <i class="fas fa-arrow-left"></i> 首页
                     </button>
-                    <h1>题库管理</h1>
+                    <h1 data-heading="LIBRARY">题库管理</h1>
                 </div>
                 <div class="manage-section">
                     <div class="bank-list" id="bank-list"></div>
@@ -313,7 +225,7 @@
                     <button class="btn btn-ghost" onclick="switchPage('dashboard')">
                         <i class="fas fa-arrow-left"></i> 首页
                     </button>
-                    <h1 id="practice-title">刷题练习</h1>
+                    <h1 id="practice-title" data-heading="PRACTICE">刷题练习</h1>
                     <div class="practice-header-info" id="practice-header-info" style="display: none;">
                         <div class="progress-info">
                             <span>进度: <strong id="current-index">1</strong> / <strong id="total-count">10</strong></span>
@@ -526,7 +438,7 @@
                     <button class="btn btn-ghost" onclick="switchPage('dashboard')">
                         <i class="fas fa-arrow-left"></i> 首页
                     </button>
-                    <h1>错题本</h1>
+                    <h1 data-heading="REVIEW">错题本</h1>
                 </div>
                 <div class="manage-section">
                     <div class="bank-list" id="wrong-bank-list"></div>
@@ -555,7 +467,6 @@
                 <div><strong>炸红题库</strong><span>DHU / 每一小步，都算数。</span></div>
                 <button class="btn btn-ghost" onclick="window.scrollTo({top:0,behavior:'smooth'})">回到顶部 ↑</button>
             </footer>
-        </div>
 
         <div class="modal" id="confirm-modal">
         <div class="modal-content">
@@ -603,7 +514,6 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script src="js/lib/mammoth.browser.min.js"></script>
     <script src="js/lib/dexie.min.js"></script>
     <script src="js/modules/storage.js"></script>
@@ -611,7 +521,7 @@
     <script src="js/app.js"></script>
     <script src="js/mobile.js"></script>
 
-    <button aria-label="打开导航菜单" class="gnav-menu-btn" id="gnavMenuBtn" onclick="toggleMobileMenu()">
+    <button aria-label="打开导航菜单" aria-expanded="false" aria-controls="primary-navigation" class="gnav-menu-btn" id="gnavMenuBtn" onclick="toggleMobileMenu()">
         <div class="menu-lines">
             <span></span><span></span><span></span>
         </div>

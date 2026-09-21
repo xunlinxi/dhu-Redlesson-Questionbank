@@ -3,6 +3,17 @@ import sys, tempfile, json
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'platforms/web'))
+# Recreate ignored binary fixture for the offline browser regression.
+from docx import Document
+artifacts = ROOT / 'test-environment/artifacts'
+artifacts.mkdir(parents=True, exist_ok=True)
+document = Document()
+document.add_paragraph('一、单项选择题')
+table = document.add_table(rows=3, cols=1)
+for row, text in zip(table.rows, ['1、表格里的题目（A）', 'A.正确选项', 'B.其他选项']):
+    row.cells[0].text = text
+document.save(artifacts / 'import-table.docx')
+
 from backend import config
 from backend.app import app
 with tempfile.TemporaryDirectory(prefix='quiz-ui-') as directory:

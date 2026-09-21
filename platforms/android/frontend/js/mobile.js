@@ -6,13 +6,6 @@
 var isLocalClient = true;
 var mobileMenuOpen = false;
 
-var isDragging = false;
-var dragMoved = false;
-var dragStartX = 0;
-var dragStartY = 0;
-var menuBtnStartX = 0;
-var menuBtnStartY = 0;
-
 // 页面加载完成后初始化
 window.addEventListener('load', function() {
     // 延迟执行，确保 app.js 已经加载
@@ -26,7 +19,7 @@ function initMobile() {
     checkClientType();
     
     // 2. 如果是小屏幕，初始化移动端菜单
-    if (window.innerWidth < 768) {
+    if (window.innerWidth <= 768) {
         createMobileMenu();
     }
 }
@@ -69,139 +62,131 @@ function showRemoteBadge() {
     document.body.appendChild(badge);
 }
 
-// 创建移动端菜单按钮
+// The same floating button handles taps and drags. Pointer capture keeps a
+// gesture attached to the button even when the finger moves outside it.
 function createMobileMenu() {
     var btn = document.getElementById('gnavMenuBtn');
-    if (!btn) {
-        btn = document.createElement('button');
-        btn.className = 'mobile-menu-btn';
-        btn.innerHTML = '<i class="fas fa-bars"></i>';
-        btn.type = 'button';
-        document.body.appendChild(btn);
-    }
-    
-    var savedPos = localStorage.getItem('mobileMenuBtnPos');
-    if (savedPos) {
-        try {
-            var pos = JSON.parse(savedPos);
-            btn.style.left = pos.x + 'px';
-            btn.style.top = pos.y + 'px';
-        } catch (e) {}
-    }
-    
+    if (!btn || btn.dataset.draggableMenu === 'true') return;
+    btn.dataset.draggableMenu = 'true';
+    btn.title = '点击打开导航，拖动调整位置';
+    btn.setAttribute('aria-label', '导航菜单，可拖动调整位置');
     initDraggableMenu(btn);
-    
-    // 点击导航项时关闭菜单
-    var navItems = document.querySelectorAll('.nav-item');
-    for (var i = 0; i < navItems.length; i++) {
-        navItems[i].onclick = function(originalClick) {
-            return function(e) {
-                closeMenu();
-                if (originalClick) originalClick.call(this, e);
-            };
-        }(navItems[i].onclick);
-    }
 }
 
 function initDraggableMenu(btn) {
-    btn.addEventListener('touchstart', handleDragStart, { passive: false });
-    btn.addEventListener('touchmove', handleDragMove, { passive: false });
-    btn.addEventListener('touchend', handleDragEnd);
-    btn.addEventListener('mousedown', handleDragStart);
-    document.addEventListener('mousemove', handleDragMove);
-    document.addEventListener('mouseup', handleDragEnd);
+    var gesture = null;
+    var suppressClick = false;
+    var storageKey = 'mobileMenuBtnPos';
+
+    function place(x, y) {
+        var viewport = window.visualViewport;
+        var left = viewport ? viewport.offsetLeft : 0;
+        var top = viewport ? viewport.offsetTop : 0;
+        var width = viewport ? viewport.width : window.innerWidth;
+        var height = viewport ? viewport.height : window.innerHeight;
+        var rect = btn.getBoundingClientRect();
+        x = Math.max(left + 8, Math.min(x, left + width - rect.width - 8));
+        y = Math.max(top + 8, Math.min(y, top + height - rect.height - 8));
+        btn.style.setProperty('--menu-x', x + 'px');
+        btn.style.setProperty('--menu-y', y + 'px');
+        btn.classList.add('menu-positioned');
+        positionMobileMenu();
+        return {x: x, y: y};
+    }
+
+    function savePosition() {
+        var rect = btn.getBoundingClientRect();
+        try { localStorage.setItem(storageKey, JSON.stringify({x: rect.left, y: rect.top})); }
+        catch (_) { /* Dragging remains available if browser storage is disabled. */ }
+    }
+
+    try {
+        var saved = JSON.parse(localStorage.getItem(storageKey));
+        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) place(saved.x, saved.y);
+    } catch (_) { /* Ignore invalid or unavailable stored preferences. */ }
+
+    btn.addEventListener('pointerdown', function(event) {
+        if (!event.isPrimary || event.button !== 0 || window.innerWidth > 768) return;
+        var rect = btn.getBoundingClientRect();
+        gesture = {id: event.pointerId, x: event.clientX, y: event.clientY,
+            left: rect.left, top: rect.top, moved: false};
+        suppressClick = false;
+        btn.setPointerCapture(event.pointerId);
+    });
+
+    btn.addEventListener('pointermove', function(event) {
+        if (!gesture || gesture.id !== event.pointerId) return;
+        var dx = event.clientX - gesture.x;
+        var dy = event.clientY - gesture.y;
+        if (!gesture.moved && Math.hypot(dx, dy) < 6) return;
+        gesture.moved = true;
+        if (!btn.hasPointerCapture(event.pointerId)) btn.setPointerCapture(event.pointerId);
+        btn.classList.add('dragging');
+        place(gesture.left + dx, gesture.top + dy);
+    });
+
+    function finish(event) {
+        if (!gesture || gesture.id !== event.pointerId) return;
+        // A captured touch gesture may not synthesize click after a drag.
+        // Resolve a touch tap on pointerup; consume its optional compatibility click.
+        const touchRelease = event.type === 'pointerup' && event.pointerType === 'touch';
+        suppressClick = event.type === 'pointerup' && (gesture.moved || touchRelease);
+        if (touchRelease && !gesture.moved) toggleMobileMenu();
+        if (gesture.moved) savePosition();
+        gesture = null;
+        btn.classList.remove('dragging');
+        // Pointer capture releases automatically after pointerup/cancel.
+    }
+    btn.addEventListener('pointerup', finish);
+    btn.addEventListener('pointercancel', finish);
+    btn.addEventListener('lostpointercapture', function(event) { if (event.target === btn) finish(event); });
+    btn.addEventListener('click', function(event) {
+        // Keyboard activation (detail=0) remains usable after a drag.
+        if (suppressClick && event.detail !== 0) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+        suppressClick = false;
+    }, true);
+
+    function positionMobileMenu() {
+        const nav = document.querySelector('.nav-links');
+        if (!nav || !nav.classList.contains('is-open') || window.innerWidth > 768) return;
+        const rect = btn.getBoundingClientRect();
+        const viewport = window.visualViewport;
+        const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
+        const width = viewport?.width || innerWidth, height = viewport?.height || innerHeight;
+        const menuWidth = nav.offsetWidth, menuHeight = nav.offsetHeight;
+        const x = Math.max(left + 8, Math.min(rect.right - menuWidth, left + width - menuWidth - 8));
+        const y = rect.top - menuHeight - 12 >= top + 8 ? rect.top - menuHeight - 12 : Math.min(rect.bottom + 12, top + height - menuHeight - 8);
+        nav.style.setProperty('--nav-x', x + 'px');
+        nav.style.setProperty('--nav-y', Math.max(top + 8, y) + 'px');
+    }
+    window.positionMobileMenu = positionMobileMenu;
+    window.resetMobileMenuPosition = function() {
+        btn.classList.remove('menu-positioned');
+        btn.style.removeProperty('--menu-x'); btn.style.removeProperty('--menu-y');
+        try { localStorage.removeItem(storageKey); } catch (_) {}
+        closeMobileNav();
+    };
+
+    function keepInView() {
+        if (window.innerWidth > 768) { closeMobileNav(); return; }
+        if (!btn.classList.contains('menu-positioned')) { positionMobileMenu(); return; }
+        var rect = btn.getBoundingClientRect();
+        place(rect.left, rect.top);
+    }
+    window.addEventListener('resize', keepInView);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', keepInView);
+        window.visualViewport.addEventListener('scroll', keepInView);
+    }
 }
 
-function handleDragStart(e) {
-    if (e.type === 'mousedown' && e.button !== 0) return;
-    
-    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
-    isDragging = true;
-    dragMoved = false;
-    dragStartX = clientX;
-    dragStartY = clientY;
-    
-    var btn = document.querySelector('.mobile-menu-btn');
-    menuBtnStartX = btn.offsetLeft;
-    menuBtnStartY = btn.offsetTop;
-    
-    if (e.type === 'touchstart') {
-        e.preventDefault();
-    }
-}
-
-function handleDragMove(e) {
-    if (!isDragging) return;
-    
-    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
-    var deltaX = clientX - dragStartX;
-    var deltaY = clientY - dragStartY;
-    
-    if (!dragMoved && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
-        dragMoved = true;
-    }
-    
-    if (!dragMoved) return;
-    
-    if (e.type === 'touchmove') {
-        e.preventDefault();
-    }
-    
-    var newX = menuBtnStartX + deltaX;
-    var newY = menuBtnStartY + deltaY;
-    
-    var btn = document.querySelector('.mobile-menu-btn');
-    var btnWidth = btn.offsetWidth || 36;
-    var btnHeight = btn.offsetHeight || 36;
-    
-    newX = Math.max(0, Math.min(newX, window.innerWidth - btnWidth));
-    newY = Math.max(0, Math.min(newY, window.innerHeight - btnHeight));
-    
-    btn.style.left = newX + 'px';
-    btn.style.top = newY + 'px';
-    btn.classList.add('dragging');
-}
-
-function handleDragEnd(e) {
-    if (!isDragging) return;
-    
-    isDragging = false;
-    
-    var btn = document.querySelector('.mobile-menu-btn');
-    if (btn) btn.classList.remove('dragging');
-    
-    if (!dragMoved) {
-        toggleMenu();
-        return;
-    }
-    
-    if (btn) {
-        localStorage.setItem('mobileMenuBtnPos', JSON.stringify({
-            x: btn.offsetLeft,
-            y: btn.offsetTop
-        }));
-    }
-}
-
-function toggleMenu() {
-    var btn = document.querySelector('.mobile-menu-btn');
-    
-    mobileMenuOpen = !mobileMenuOpen;
-    
-    if (typeof toggleMobileNav === 'function') {
-        toggleMobileNav();
-    }
-}
-
-function closeMenu() {
-    if (mobileMenuOpen) {
-        toggleMenu();
-    }
-}
+// Also initialize when a desktop window enters the mobile breakpoint.
+window.addEventListener('resize', function() {
+    if (window.innerWidth <= 768) createMobileMenu();
+});
 
 // ==================== 本地存储功能 ====================
 function setupLocalStorage() {

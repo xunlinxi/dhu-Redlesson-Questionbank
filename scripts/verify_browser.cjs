@@ -25,6 +25,7 @@ const fs = require('fs');
  await page.setViewportSize({width:390,height:844});
  await page.screenshot({path:'test-environment/artifacts/question-mobile.jpg',quality:65,fullPage:true});
  await page.evaluate(()=>switchPage('dashboard'));
+ await page.waitForTimeout(900);
  await page.screenshot({path:'test-environment/artifacts/home-mobile.jpg',quality:65,fullPage:true});
  console.log('OVERFLOW:',await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth));
  console.log('PAGE_ERRORS:',errors);

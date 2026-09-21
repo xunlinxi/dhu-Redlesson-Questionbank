@@ -59,20 +59,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); element.click(); }
         });
     });
-    initFeaturesCarousel();
 
-    // Electron 环境特殊处理
-    if (isElectron) {
-        serverOnline = true;
-        await loadStats();
-    }
 
-    if (window.STATIC_MODE || window.storageService?.isMobile) {
-        await window.storageService.ready;
-        serverOnline = true;
-        await loadStats();
-        await loadBankChapters();
-    }
+    await window.storageService.ready;
+    await Promise.allSettled([loadStats(), loadBankChapters()]);
     await loadConfig();
 
     // Electron 环境不需要健康检查
@@ -88,6 +78,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     window.togglePanel = togglePanel;
 
     initAnimations();
+    document.body.classList.add("ui-ready");
 });
 
 // ==================== 面板折叠功能 ====================
@@ -239,28 +230,26 @@ function initNavigation() {
         });
     });
 
-    var menuBtn = document.querySelector('.mobile-menu-btn');
-    if (menuBtn) {
-        menuBtn.addEventListener('click', function() {
-            toggleMobileNav();
-        });
-    }
+    document.addEventListener('pointerdown', function(event) {
+        if (window.innerWidth <= 768 && !event.target.closest('.nav-links, #gnavMenuBtn')) closeMobileNav();
+    });
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') closeMobileNav();
+    });
 }
 
-function toggleMobileNav() {
-    var links = document.querySelector('.nav-links');
-    var btn = document.querySelector('.mobile-menu-btn');
-    if (!links) return;
-    links.classList.toggle('mobile-open');
-    if (btn) btn.classList.toggle('active');
+function setMobileNavOpen(open) {
+    const nav = document.querySelector('.nav-links');
+    const btn = document.getElementById('gnavMenuBtn');
+    if (!nav || !btn) return;
+    nav.classList.toggle('is-open', open);
+    nav.classList.remove('mobile-open');
+    btn.classList.toggle('is-active', open);
+    btn.setAttribute('aria-expanded', String(open));
+    if (open && window.positionMobileMenu) window.positionMobileMenu();
 }
-
-function closeMobileNav() {
-    var links = document.querySelector('.nav-links');
-    var btn = document.querySelector('.mobile-menu-btn');
-    if (links) links.classList.remove('mobile-open');
-    if (btn) btn.classList.remove('active');
-}
+function toggleMobileNav() { toggleMobileMenu(); }
+function closeMobileNav() { setMobileNavOpen(false); }
 
 function switchPage(page) {
     document.querySelectorAll('.nav-link').forEach(item => {
@@ -274,6 +263,9 @@ function switchPage(page) {
     document.getElementById(`${page}-page`).classList.add('active');
     
     currentPage = page;
+    closeMobileNav();
+    window.scrollTo({top:0, behavior:'instant'});
+    updateNavSurface();
     
     document.body.setAttribute('data-page', page);
     
@@ -1067,6 +1059,8 @@ async function updateAvailableStats() {
 }
 
 function showPracticeSettings() {
+    document.getElementById('practice-title').textContent = '刷题练习';
+    document.getElementById('practice-title').dataset.heading = 'PRACTICE';
     document.getElementById('practice-settings').style.display = 'flex';
     document.getElementById('practice-area').style.display = 'none';
     document.getElementById('practice-result').style.display = 'none';
@@ -1110,7 +1104,7 @@ async function startPractice(examMode = false) {
         
         if (data.success && data.questions.length > 0) {
             practiceQuestions = data.questions.map(q => {
-                if (shuffleOptionsEnabled) {
+                if (shuffleOptionsEnabled && q.type !== 'judge') {
                     const shuffled = shuffleEntries(Object.entries(q.options || {}), q.answer);
                     return {
                         ...q,
@@ -1599,7 +1593,7 @@ function shuffleEntries(entries, originalAnswer) {
         reverseAnswerMap[keys[index]] = originalKey;
         return [keys[index], value];
     });
-    return {entries: result, shuffledAnswer: (originalAnswer || []).map(key => answerMap[key]), reverseAnswerMap};
+    return {entries: result, shuffledAnswer: (originalAnswer || []).map(key => answerMap[key] || key), reverseAnswerMap};
 }
 
 async function submitAnswer() {
@@ -1766,6 +1760,11 @@ function arraysEqual(a, b) {
 function showPracticeResult() {
     if (practiceFinished) return;
     practiceFinished = true;
+    const resultTitle = document.getElementById('practice-title');
+    resultTitle.textContent = '练习结果';
+    resultTitle.dataset.heading = 'RESULTS';
+    resultTitle.style.display = 'block';
+    window.scrollTo({top:0, behavior:'instant'});
     // 停止计时器
     if (practiceTimer) {
         clearInterval(practiceTimer);
@@ -2251,7 +2250,7 @@ async function startSequencePractice() {
         
         if (data.success && data.questions.length > 0) {
             practiceQuestions = data.questions.map(q => {
-                if (shuffleOptionsEnabled) {
+                if (shuffleOptionsEnabled && q.type !== 'judge') {
                     const shuffled = shuffleEntries(Object.entries(q.options || {}), q.answer);
                     return {
                         ...q,
@@ -2303,7 +2302,7 @@ async function startWrongPractice() {
         
         if (data.success && data.questions.length > 0) {
             practiceQuestions = data.questions.map(q => {
-                if (shuffleOptionsEnabled) {
+                if (shuffleOptionsEnabled && q.type !== 'judge') {
                     const shuffled = shuffleEntries(Object.entries(q.options || {}), q.answer);
                     return {
                         ...q,
@@ -2713,7 +2712,12 @@ async function loadProgress(progressId) {
             
             const questionMap = {};
             questionsData.questions.forEach(q => { questionMap[q.id] = q; });
-            practiceQuestions = questionIds.map(id => questionMap[id]).filter(q => q);
+            const restoredQuestions = questionIds.map(id => questionMap[id]).filter(q => q);
+            if (restoredQuestions.length !== questionIds.length) {
+                showToast('题库已变更，存档中部分题目不存在，请重新开始练习；原存档已保留', 'warning');
+                return;
+            }
+            practiceQuestions = restoredQuestions;
             
             if (practiceQuestions.length === 0) {
                 showToast('进度中的题目已被删除', 'error');
@@ -2846,10 +2850,10 @@ async function deleteProgress(progressId, silent = false) {
 // ==================== 动画系统 ====================
 function initAnimations() {
     initPageLoader();
-    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) initParticles();
+
     initScrollReveal();
-    initMouseGlow();
-    initButtonRipple();
+
+
     initNavScroll();
     if (typeof featureCarousel !== 'undefined' && featureCarousel) featureCarousel.init();
 }
@@ -2977,16 +2981,15 @@ function initButtonRipple() {
     });
 }
 
+function updateNavSurface() {
+    const nav = document.getElementById('topNav');
+    const opening = document.querySelector('.night-opening');
+    if (nav) nav.classList.toggle('on-paper', currentPage !== 'dashboard' || !opening || opening.getBoundingClientRect().bottom <= nav.offsetHeight);
+}
 function initNavScroll() {
-    var nav = document.getElementById('topNav');
-    if (!nav) return;
-    window.addEventListener('scroll', function() {
-        if (window.scrollY > 20) {
-            nav.classList.add('scrolled');
-        } else {
-            nav.classList.remove('scrolled');
-        }
-    });
+    updateNavSurface();
+    window.addEventListener('scroll', updateNavSurface, {passive:true});
+    window.addEventListener('resize', updateNavSurface);
 }
 
 var fcState = {
@@ -3114,9 +3117,6 @@ function updateCarouselDisplay() {
 }
 
 function toggleMobileMenu() {
-    var btn = document.getElementById('gnavMenuBtn');
-    var nav = document.querySelector('.top-nav .nav-links');
-    if (!btn || !nav) return;
-    btn.classList.toggle('is-active');
-    nav.classList.toggle('is-open');
+    const nav = document.querySelector('.nav-links');
+    setMobileNavOpen(!nav?.classList.contains('is-open'));
 }

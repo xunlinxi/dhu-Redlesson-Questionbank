@@ -49,3 +49,56 @@ def test_invalid_practice_counts(client, monkeypatch, query):
     response = client.get('/api/practice/random?' + query)
     assert response.status_code == 400
     assert response.json['success'] is False
+
+@pytest.fixture
+def isolated_import(client, monkeypatch, tmp_path):
+    from backend.models.questions import QuestionsModel
+    from backend.routes import banks
+    monkeypatch.setattr(QuestionsModel, 'get_file_path', staticmethod(lambda: str(tmp_path / 'questions.json')))
+    uploads = tmp_path / 'uploads'
+    uploads.mkdir()
+    monkeypatch.setattr(banks, 'UPLOAD_FOLDER', str(uploads))
+    return client, uploads
+
+
+def test_docx_table_upload_route(isolated_import):
+    client, uploads = isolated_import
+    document = Document()
+    document.add_paragraph('一、单项选择题')
+    table = document.add_table(rows=3, cols=1)
+    for row, text in zip(table.rows, ['1、表格题（B）', 'A.甲', 'B.乙']):
+        row.cells[0].text = text
+    buffer = io.BytesIO()
+    document.save(buffer)
+    buffer.seek(0)
+    response = client.post('/api/import', data={'file': (buffer, '表格.docx'), 'bank_name': '表格'})
+    assert response.status_code == 200
+    assert response.json['question_count'] == 1
+    assert list(uploads.iterdir()) == []
+
+
+def test_invalid_import_keeps_previous_bank(isolated_import):
+    client, uploads = isolated_import
+    for text, expected in [('1、测试（A）\nA.甲\nB.乙', 200), ('完全没有题目', 400)]:
+        response = client.post('/api/import', data={'file': (io.BytesIO(text.encode()), 'test.txt'), 'bank_name': '保留'})
+        assert response.status_code == expected
+        assert list(uploads.iterdir()) == []
+    questions = client.get('/api/questions?bank=保留').json['questions']
+    assert len(questions) == 1
+    assert questions[0]['answer'] == ['A']
+
+
+def test_partial_import_reports_skipped_questions(isolated_import):
+    client, _ = isolated_import
+    text = '1、有效（A）\nA.甲\nB.乙\n2、无答案（）\nA.甲\nB.乙'
+    response = client.post('/api/import', data={'file': (io.BytesIO(text.encode()), 'test.txt')})
+    assert response.json['question_count'] == 1
+    assert len(response.json['warnings']) == 1
+
+
+@pytest.mark.parametrize('keyword,count', [('毛概',345), ('纲要',550), ('习近平',367), ('思想道德',278)])
+def test_shipped_corpus(keyword, count):
+    root = Path(__file__).resolve().parents[2] / 'files'
+    path = next(p for p in root.glob('*.txt') if keyword in p.name)
+    questions, *_ = parse_file(str(path))
+    assert len(questions) == count

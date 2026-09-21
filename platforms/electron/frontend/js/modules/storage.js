@@ -119,19 +119,24 @@ class StorageService {
                 let result = [];
                 const singles = questions.filter(q => q.type === 'single');
                 const multis = questions.filter(q => q.type === 'multi');
+                const judges = questions.filter(q => q.type === 'judge');
 
                 const sCount = parseInt(params.single_count) || 0;
                 const mCount = parseInt(params.multi_count) || 0;
+                const jCount = parseInt(params.judge_count) || 0;
                 const totalCount = parseInt(params.count) || 0;
 
-                if (sCount > 0 || mCount > 0) {
+                if (sCount > 0 || mCount > 0 || jCount > 0) {
                     if (sCount > 0) result = result.concat(singles.slice(0, sCount));
                     if (mCount > 0) result = result.concat(multis.slice(0, mCount));
+                    if (jCount > 0) result = result.concat(judges.slice(0, jCount));
                 } else if (totalCount > 0) {
                     if (params.type === 'single') {
                         result = singles.slice(0, totalCount);
                     } else if (params.type === 'multi') {
                         result = multis.slice(0, totalCount);
+                    } else if (params.type === 'judge') {
+                        result = judges.slice(0, totalCount);
                     } else {
                         result = questions.slice(0, totalCount);
                     }
@@ -232,7 +237,7 @@ class StorageService {
 
     async getWrongBook(bankName) {
         if (this.isElectron) {
-            return await window.electronAPI.getWrongBook(bankName);
+            return await window.electronAPI.getWrongbook({bank: bankName});
         } else if (this.isMobile) {
             try {
                 const wrongEntries = await this.db.wrongbook
@@ -525,7 +530,7 @@ class StorageService {
     
     async saveRanking(data) {
         if (this.isElectron) {
-            return await window.electronAPI.saveRanking(data);
+            return await window.electronAPI.addRanking(data);
         } else if (this.isMobile) {
              try {
                  await this.db.rankings.add({
@@ -575,10 +580,12 @@ class StorageService {
     
     async getProgressById(id) {
          if (this.isElectron) {
-            return await window.electronAPI.loadProgress(id);
+            const result = await window.electronAPI.getProgress();
+            const progress = result.progress_list?.find(p => String(p.id) === String(id));
+            return progress ? {success:true, progress} : {success:false, error:'进度不存在'};
         } else if (this.isMobile) {
              try {
-                 const p = await this.db.progress.get(Number(id)); // Dexie IDs are numbers if ++id
+                 const p = await this.db.progress.get(id) || await this.db.progress.get(Number(id));
                  if (p) return { success: true, progress: p };
                  return { success: false, error: 'Not found' };
              } catch (e) { return { success: false, error: e.message }; }
@@ -593,8 +600,9 @@ class StorageService {
             return await window.electronAPI.saveProgress(data);
         } else if (this.isMobile) {
              try {
-                 const id = await this.db.progress.put({
-                     ...data,
+                 const id = data.progress_id || crypto.randomUUID();
+                 await this.db.progress.put({
+                     ...data, id,
                      date: new Date()
                  });
                  return { success: true, id: id };
@@ -614,6 +622,7 @@ class StorageService {
             return await window.electronAPI.deleteProgress(id);
         } else if (this.isMobile) {
              try {
+                 await this.db.progress.delete(id);
                  await this.db.progress.delete(Number(id));
                  return { success: true };
              } catch (e) { return { success: false, error: e.message }; }

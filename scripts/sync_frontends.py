@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'platforms/web/frontend'
-COMMON = ['index.html', 'css/style.css', 'css/mobile.css', 'css/cosmic.css',
+COMMON = ['index.html', 'css/style.css', 'css/mobile.css', 'css/cosmic.css', 'css/editorial.css',
           'js/app.js', 'js/mobile.js', 'js/modules/parser.js', 'js/modules/storage.js',
           'js/lib/dexie.min.js', 'js/lib/mammoth.browser.min.js']
 STATIC_SCRIPTS = '''    <script src="js/lib/mammoth.browser.min.js"></script>
@@ -19,10 +19,16 @@ STATIC_SCRIPTS = '''    <script src="js/lib/mammoth.browser.min.js"></script>
 
 
 def outputs():
+    for folder in ['vendor', 'img/illustrations']:
+        for source in (SOURCE / folder).rglob('*'):
+            if source.is_file():
+                for destination in ['platforms/android/frontend', 'platforms/electron/frontend', 'platforms/web/static-site']:
+                    yield ROOT / destination / source.relative_to(SOURCE), source.read_bytes()
+
     for platform in ['android', 'electron']:
         for relative in COMMON:
             yield ROOT / f'platforms/{platform}/frontend' / relative, (SOURCE / relative).read_bytes()
-    for relative in ['css/style.css', 'css/mobile.css', 'css/cosmic.css', 'js/app.js', 'js/mobile.js', 'js/modules/parser.js', 'js/lib/mammoth.browser.min.js']:
+    for relative in ['css/style.css', 'css/mobile.css', 'css/cosmic.css', 'css/editorial.css', 'js/app.js', 'js/mobile.js', 'js/modules/parser.js', 'js/lib/mammoth.browser.min.js']:
         yield ROOT / 'platforms/web/static-site' / relative, (SOURCE / relative).read_bytes()
     html = (SOURCE / 'index.html').read_text(encoding='utf-8')
     start = html.index('    <script src="js/lib/mammoth')

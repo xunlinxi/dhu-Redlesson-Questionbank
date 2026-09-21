@@ -29,10 +29,10 @@ flowchart LR
 # 安装依赖
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r platforms/web/requirements.txt
 
 # 启动服务
-python main.py
+python platforms/web/main.py
 ````
 
 浏览器自动打开 http://localhost:50000
@@ -102,3 +102,21 @@ B. 选项B
 ## 许可证
 
 MIT License
+
+
+## 多端维护与回归验证
+
+公共运行源码以 `platforms/web/frontend/` 为准，Android、Electron 和静态站点通过显式脚本同步：
+
+```bash
+python scripts/sync_frontends.py
+python scripts/sync_frontends.py --check
+node --test scripts/test-frontend.cjs
+python -m pytest platforms/web/tests -q
+```
+
+Android 修改完成后仍需在 `platforms/android` 下执行 `npx cap sync android`。不要手动修改 `assets/public/`。
+
+本轮修复、界面设计、浏览器验证方式和原生测试边界见 [多端优化记录](docs/2026-09-16-improvements.md)。
+
+2026-09-21：进一步完善参考站下半页的深浅分区、功能特色与各功能页细节，并完成手机悬浮导航自由拖动。详见 [界面与移动导航记录](docs/2026-09-21-ui-navigation.md)。

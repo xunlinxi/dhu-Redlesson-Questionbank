@@ -43,3 +43,33 @@ test('missing answer rejected instead of silently importing ungradable question'
  const p=context().window.questionParser;
  assert.throws(()=>p.parseText('1、缺少答案\nA.甲\nB.乙'),/答案/);
 });
+
+test('judge answers remain valid when shuffle has no options',()=>{
+ const c=context();
+ const result=vm.runInContext("shuffleEntries([],['对'])",c);
+ assert.deepEqual(Array.from(result.shuffledAnswer),['对']);
+});
+test('all four shipped banks parse without silently losing gradable questions',()=>{
+ const parser=context().window.questionParser;
+ const expected=[['毛概',345],['纲要',550],['习近平',367],['思想道德',278]];
+ for(const [name,count] of expected){
+  const file=fs.readdirSync('platforms/files').find(f=>f.includes(name)&&f.endsWith('.txt'));
+  const questions=parser.parseText(parser.detectEncodingAndDecode(fs.readFileSync('platforms/files/'+file)));
+  assert.equal(questions.length,count,name);
+  assert.equal(parser.warnings.length,name==='习近平'?1:0,name+' diagnostics');
+ }
+});
+test('storage Electron methods match the actual preload bridge',async()=>{
+ let api;const calls=[];
+ vm.runInNewContext(fs.readFileSync('platforms/electron/preload.js','utf8'),{require:()=>({contextBridge:{exposeInMainWorld:(_,value)=>api=value},ipcRenderer:{invoke:async(channel,...args)=>{calls.push(channel);return channel==='get-progress'?{success:true,progress_list:[{id:'saved'}]}:{success:true};}}})});
+ const c=vm.createContext({window:{electronAPI:api,location:{protocol:'file:'}},console});
+ vm.runInContext(fs.readFileSync('platforms/web/frontend/js/modules/storage.js','utf8'),c);
+ await c.window.storageService.getWrongBook('bank');await c.window.storageService.saveRanking({});
+ assert.equal((await c.window.storageService.getProgressById('saved')).progress.id,'saved');
+ assert.deepEqual(calls,['get-wrongbook','add-ranking','get-progress']);
+});
+test('simultaneous exam finish settles once',async()=>{
+ const c=context();
+ await vm.runInContext("isExamMode=true;var settled=0;calculateExamResults=async()=>{settled++};showPracticeResult=()=>{practiceFinished=true}; Promise.all([finishPractice(),finishPractice()])",c);
+ assert.equal(vm.runInContext('settled',c),1);
+});

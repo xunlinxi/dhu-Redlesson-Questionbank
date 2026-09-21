@@ -159,3 +159,67 @@ html,* {touch-action:auto;}
  .practice-actions {flex-direction:row!important;}.practice-actions .btn {width:auto;flex:1;}
  .toast-container {top:80px!important;right:18px!important;}
 }
+
+/* Quiet typography and illustration pass. No continuous animation. */
+:root {--font-main:"Segoe UI","Microsoft YaHei UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;--font-display:var(--font-main);}
+body {font-size:15px;line-height:1.7;}
+.hero-title {font-weight:800!important;letter-spacing:-.045em!important;line-height:1.18!important;}
+.hero-title em {letter-spacing:-.04em!important;font-weight:700;}
+.hero-subtitle {font-size:16px!important;line-height:1.95!important;letter-spacing:.01em;}
+.hero-eyebrow,.hero-footnote,.section-kicker,.orbit-caption,.study-ticket small {font-family:"Segoe UI",sans-serif;letter-spacing:.16em;font-weight:500;}
+.lunar-art {width:100%;height:auto;display:block;filter:drop-shadow(0 20px 30px #05141c30);}
+.lunar-stage {max-width:465px;}
+.study-ticket {bottom:1%;left:4%;right:2%;padding:18px 23px;transform:rotate(-3deg);background:#102938f2;box-shadow:4px 4px 0 #04131c60;}
+.study-ticket strong {font-weight:600;font-size:20px;letter-spacing:.03em;}
+.study-ticket .ticket-number {font-size:30px;font-weight:300;}
+.orbit-caption {right:0;top:18%;font-size:10px;opacity:.7;}
+.hero-footnote span {box-shadow:none;}
+.nav-brand i,.stat-num,.bento-icon,.hero-title,.neon-text {text-shadow:none!important;animation:none!important;}
+.btn,.bento-card,.nav-link,.option-btn {transition:background-color .16s ease,border-color .16s ease,transform .16s ease!important;}
+.btn:hover {transform:translateY(-1px)!important;}.btn:active {transform:translateY(0)!important;}
+.bento-card:hover {transform:translateY(-2px)!important;}.option-btn:hover {transform:none!important;}
+.method-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:30px;margin-top:25px;}
+.study-methods {padding:32px 0 12px;}.method-grid article {padding:4px 0 4px 18px;border-left:1px solid #3c5a66;}
+.method-index {font:13px/1.6 "Segoe UI",sans-serif;color:#91c4bd;letter-spacing:.15em;}
+.method-grid h3 {font-size:17px;font-weight:600;margin:10px 0 8px;}.method-grid p {font-size:13px;color:#a7c0ca;line-height:1.85;}
+.question-type {font-size:12px;font-weight:600;}.question-id {font-family:var(--font-main);font-size:11px;opacity:.6;}
+.question-card .question-content {font-size:20px!important;font-weight:500;line-height:1.9!important;}
+.option-btn .option-text {font-weight:400;}.question-header {gap:10px!important;flex-wrap:wrap;}
+.page {animation:quiet-page-in .25s ease-out;}
+@keyframes quiet-page-in {from{opacity:.65;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:no-preference) {
+ .ui-ready .hero-copy {animation:quiet-entrance .55s ease-out both;}
+ .ui-ready .lunar-art {animation:quiet-entrance .75s ease-out both;}
+ @keyframes quiet-entrance {from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+}
+@media(max-width:600px) {
+ .hero-title {font-size:49px!important;}.hero-subtitle {font-size:14px!important;}
+ .lunar-stage {width:245px;}.study-ticket {padding:12px 16px;}.study-ticket strong {font-size:16px;}.orbit-caption {font-size:8px;}
+ .method-grid {grid-template-columns:1fr;gap:22px;margin-top:22px;}.study-methods {padding-top:24px;}
+ .method-grid h3 {font-size:16px;margin:5px 0;}.method-grid p {font-size:13px;}
+ .question-card .question-content {font-size:18px!important;}
+ .bento-card {min-height:0!important;}.bento-card p {line-height:1.8;}
+}
+@media(prefers-reduced-motion:reduce) {*,*::before,*::after {animation:none!important;transition:none!important;scroll-behavior:auto!important;}}
+/* Keep content visible when system animations are disabled. */
+.stagger-in > * {opacity:1!important;transform:none!important;animation:none!important;}
+.page h1:not(.hero-title) {background:none!important;-webkit-text-fill-color:var(--text-primary)!important;color:var(--text-primary)!important;text-shadow:none!important;letter-spacing:0!important;}
+.page h1:not(.hero-title)::before,.page h1:not(.hero-title)::after {display:none!important;}
+.settings-card h3 {font-size:14px!important;letter-spacing:0;font-weight:600;}
+.settings-card label,.settings-card p {font-size:14px;}
+
+/* Coordinates are explicit only after dragging/restoring a saved position. */
+@media (max-width:768px) {
+    #gnavMenuBtn {touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;}
+    #gnavMenuBtn.menu-positioned {left:var(--menu-x)!important;top:var(--menu-y)!important;right:auto!important;bottom:auto!important;}
+    #gnavMenuBtn.dragging {cursor:grabbing;transition:none!important;transform:none!important;}
+}
+
+#gnavMenuBtn > * {pointer-events:none;}
+.nav-position-reset {display:none;}
+@media(max-width:768px) {
+ .top-nav {backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
+ .top-nav .nav-links.is-open {position:fixed!important;left:var(--nav-x,16px)!important;top:var(--nav-y,90px)!important;right:auto!important;width:250px!important;max-width:calc(100vw - 16px);max-height:calc(100dvh - 24px);overflow-y:auto;margin:0!important;display:flex!important;border:1px solid #597885;border-radius:16px;padding:10px!important;}
+ .nav-position-reset {display:block;background:none;border:0;border-top:1px solid #59788555;padding:12px;color:inherit;font-size:12px;cursor:pointer;}
+ #gnavMenuBtn .menu-lines span {background:#103a39;}
+}
