@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from backend.parser import parse_file
 
-FILES_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'files')
+FILES_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'resources', 'question-banks')
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'data')
 PRESET_FILE = os.path.join(OUTPUT_DIR, 'preset.json')
 

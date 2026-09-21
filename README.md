@@ -1,122 +1,64 @@
-# DHU 红课题库刷题系统
+# 炸红题库
 
-基于 Web 的题库刷题系统，支持多格式题库导入、多种练习模式，可在局域网内多设备访问。
-（当前仅测试 2025-2026 第一学期习概/毛概/思修/近代史题库）
+政治理论课程题库练习工具，支持 TXT / DOCX / DOC 导入、随机与顺序练习、模拟考试、错题本和进度保存。
 
-## 功能概述
+## 目录
 
-| 模块     | 功能                                        |
-| -------- | ------------------------------------------- |
-| 题库管理 | 导入(.doc/.docx/.txt)、编辑、删除、章节分类 |
-| 练习模式 | 随机抽题、模拟考试、顺序做题、错题练习      |
-| 练习配置 | 题库/章节筛选、题目数量、选项打乱、限时     |
-| 数据管理 | 进度保存、错题本、成绩排行榜                |
-| 多端访问 | 响应式设计、局域网/热点访问、远程模式       |
-
-## 系统架构
-
-```mermaid
-flowchart LR
-    A[客户端] -->|HTTP| B[Frontend<br/>HTML/CSS/JS]
-    B -->|REST API| C[Backend<br/>Flask]
-    C --> D[(Data<br/>JSON)]
+```text
+resources/question-banks/     原始题库文件
+platforms/web/               Flask 服务及公共前端源码
+  backend/                   API、解析器与数据模型
+  frontend/                  公共页面、脚本、样式和资源
+  scripts/export_static.py   导出静态站点题库
+  static-site/               GitHub Pages 站点及其存储适配层
+  data/                      Web 运行数据（保留）
+platforms/android/           Capacitor 项目、同步后的前端、预置题库导出脚本
+platforms/electron/          Electron 主进程、IPC、Python 桥接及 Windows 打包脚本
+scripts/sync_frontends.py    四端公共源码同步
+.github/workflows/           源码校验与各平台构建、部署
 ```
 
+## 运行 Web
 
-## 快速开始
+在项目根目录执行：
 
-```bash
-# 安装依赖
+```powershell
 python -m venv .venv
-.venv\Scripts\activate
-pip install -r platforms/web/requirements.txt
-
-# 启动服务
-python platforms/web/main.py
-````
-
-浏览器自动打开 http://localhost:50000
-
-## 多设备访问
-
-| 访问方式 | 地址                       | 配置                             |
-| -------- | -------------------------- | -------------------------------- |
-| 本机     | http://127.0.0.1:50000     | 无需配置                         |
-| 局域网   | http://192.168.x.x:50000   | 运行 `setup_firewall.bat`        |
-| 热点     | http://192.168.137.1:50000 | 运行 `防火墙开关.bat` 关闭防火墙 |
-
-## 题库格式
-
-```
-一、单项选择题
-1、题目内容（A）
-A. 选项A
-B. 选项B
-
-二、多项选择题
-1、题目内容（ABC）
-A. 选项A
-B. 选项B
+.venv\Scripts\python.exe -m pip install -r platforms/web/requirements.txt
+.venv\Scripts\python.exe platforms/web/main.py
 ```
 
-## 技术栈
+访问 http://127.0.0.1:50000。旧版 `.doc` 解析需要 Windows、Microsoft Word 和 pywin32；其他平台使用 `.docx` 或 `.txt`。
 
-- 后端：Python Flask
-- 前端：HTML5 + CSS3 + JavaScript
-- 文档解析：python-docx, pywin32
-- 数据存储：JSON
+## 多端维护
 
-## 注意事项
+修改 `platforms/web/frontend/` 后执行：
 
-1. 推荐使用 TXT 格式导入题库
-2. .doc 文件解析需要安装 Microsoft Word（仅 Windows）
-3. 热点访问需临时关闭防火墙，使用后请重新开启
-
-## 最近更新
-
-### v0.7.4 — Web / Android / Electron 多端 bug 修复（2026-08-11）
-
-**Web 端（Flask）**
-
-- 修复模拟考试倒计时结束时未判分、全部按未作答处理的问题
-- 修复服务器重连后练习会话被重置的问题；重连现在仅刷新侧栏数据并恢复已暂停的计时器
-- 错题本支持判断题练习（筛选、校验、数量显示、"再来一次"恢复）
-- 修复远程模式排行榜字段映射错位（`player_name`/`bank_name`/`score` → `name`/`accuracy`/`time_display`）
-- 题库名/错题列表/题目详情渲染增加 HTML 转义（`escapeAttr`），防止单引号破坏内联 onclick 及 XSS
-- `get_banks` 接口返回学期（`semester`）字段
-- 修复 `calculateExamResults` 原地排序污染用户答案数组的问题
-- 修复移动端未选题库时 `.where('bank').equals('')` 返回空结果的筛选 bug
-
-**Android（Capacitor）**
-
-- 同步上述 Web 端修复：考试判分、重连接管、排行榜字段、HTML 转义、排序污染、空题库筛选
-- 错题本统计与 `getPracticeWrong` 增加判断题计数与筛选
-
-**Electron（桌面端）**
-
-- 同步上述 Web 端修复
-- 后端 IPC `practice-random` / `practice-wrong` 增加判断题抽取，修复未按题型数量筛选及原地混洗问题
-- `get-wrongbook-stats` 增加判断题统计
-- 前端 `startPractice`（随机模式）补充 `judge_count` 参数
-
-## 许可证
-
-MIT License
-
-
-## 多端维护与回归验证
-
-公共运行源码以 `platforms/web/frontend/` 为准，Android、Electron 和静态站点通过显式脚本同步：
-
-```bash
+```powershell
 python scripts/sync_frontends.py
 python scripts/sync_frontends.py --check
-node --test scripts/test-frontend.cjs
-python -m pytest platforms/web/tests -q
 ```
 
-Android 修改完成后仍需在 `platforms/android` 下执行 `npx cap sync android`。不要手动修改 `assets/public/`。
+Android 再执行：
 
-本轮修复、界面设计、浏览器验证方式和原生测试边界见 [多端优化记录](docs/2026-09-16-improvements.md)。
+```powershell
+cd platforms/android
+npm ci
+npx cap sync android
+cd android
+.\gradlew.bat --version
+.\gradlew.bat assembleDebug
+```
 
-2026-09-21：进一步完善参考站下半页的深浅分区、功能特色与各功能页细节，并完成手机悬浮导航自由拖动。详见 [界面与移动导航记录](docs/2026-09-21-ui-navigation.md)。
+项目使用 **JDK 25 + Gradle 9.2.0**。本机已验证 JDK 位于 `D:\Software\Java\jdk-25.0.4.1`。终端使用 `JAVA_HOME` 或 PATH 中的 Java；不要把个人绝对路径提交到公共构建配置。Android Java 编译目标保留 21。
+
+Windows 桌面版：
+
+```powershell
+cd platforms/electron
+npm install
+npm run setup-python
+npm run build:win
+```
+
+[开发与数据说明](docs/development.md) 包含资源来源、导出与运行校验说明。依赖目录、构建产物和运行数据不属于本次源码清理范围。

@@ -12,7 +12,6 @@ from flask import Blueprint, request, jsonify
 from backend.config import UPLOAD_FOLDER, allowed_file
 from backend.models.questions import QuestionsModel
 from backend.parser import parse_file
-from backend.utils import convert_word_to_txt
 
 banks_bp = Blueprint('banks', __name__)
 

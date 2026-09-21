@@ -57,10 +57,9 @@ uploads/*.pdf
 # 保留必要文件
 !requirements.txt
 !platforms/web/requirements.txt
-!platforms/files/*.txt
-!platforms/files/*.doc
-!platforms/files/*.docx
-!test-questions.txt
+!resources/question-banks/*.txt
+!resources/question-banks/*.doc
+!resources/question-banks/*.docx
 
 # 临时文件
 tmp/
@@ -100,6 +99,4 @@ platforms/web/backend/models/__pycache__/
 !platforms/web/frontend/js/lib/
 !platforms/electron/frontend/js/lib/
 !platforms/web/static-site/js/lib/
-# Local verification artifacts
-test-environment/artifacts/
 

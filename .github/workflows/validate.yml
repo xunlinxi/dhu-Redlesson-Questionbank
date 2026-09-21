@@ -1,0 +1,30 @@
+name: Source validation
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  sources:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check synchronized sources
+        run: python scripts/sync_frontends.py --check
+      - name: Check Python syntax
+        run: python -m compileall -q platforms/web/backend platforms/web/main.py platforms/web/scripts platforms/android/scripts platforms/electron/python_parser.py platforms/electron/backend_parser.py
+      - name: Check JavaScript syntax
+        run: |
+          node --check platforms/web/frontend/js/app.js
+          node --check platforms/web/frontend/js/mobile.js
+          node --check platforms/web/frontend/js/modules/parser.js
+          node --check platforms/web/frontend/js/modules/storage.js
+          node --check platforms/electron/main.js
+          node --check platforms/electron/preload.js

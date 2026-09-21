@@ -7,12 +7,9 @@
     "start": "electron .",
     "dev": "set NODE_ENV=development&& electron .",
     "build:win": "set ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/&& electron-builder --win --config build/builder-win.yaml",
-    "build:mac": "electron-builder --mac --config build/builder-mac.yaml",
-    "build:all": "npm run build:win && npm run build:mac",
     "install-python": "node scripts/download-python.js",
     "install-libs": "node scripts/install-python-libs.js",
-    "setup-python": "npm run install-python && npm run install-libs",
-    "test-python": "node scripts/test-python.js"
+    "setup-python": "npm run install-python && npm run install-libs"
   },
   "dependencies": {
     "fs-extra": "^11.2.0"

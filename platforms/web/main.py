@@ -79,7 +79,7 @@ def main():
         print(f"  http://{ip}:50000 {network_type}")
     print("=" * 60)
     print("【手机/其他设备无法访问？】")
-    print("  请以管理员身份运行 setup_firewall.bat 配置防火墙")
+    print("  请以管理员身份运行 scripts/setup_firewall.bat 配置防火墙")
     print("=" * 60)
     print("按 Ctrl+C 停止服务器")
     

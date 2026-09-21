@@ -16,10 +16,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up JDK 21
+    - name: Set up JDK 25
       uses: actions/setup-java@v4
       with:
-        java-version: '21'
+        java-version: '25'
         distribution: 'temurin'
         cache: 'gradle'
 
@@ -34,7 +34,7 @@ jobs:
       working-directory: ./platforms/android
       run: npm ci
 
-    - name: Sync Capacitor (generate cordova plugins only)
+    - name: Sync Capacitor assets and plugins
       working-directory: ./platforms/android
       run: npx cap sync android
 
@@ -56,12 +56,12 @@ jobs:
         fi
         echo "✓ mobile.js 存在"
         
-        echo "检查 assets/public/js/modules/practice.js..."
-        if [ ! -f android/app/src/main/assets/public/js/modules/practice.js ]; then
-          echo "❌ 错误: practice.js 不存在"
+        echo "检查 assets/public/js/modules/parser.js..."
+        if [ ! -f android/app/src/main/assets/public/js/modules/parser.js ]; then
+          echo "❌ 错误: parser.js 不存在"
           exit 1
         fi
-        echo "✓ practice.js 存在"
+        echo "✓ parser.js 存在"
         
         echo "检查 assets/public/css/mobile.css..."
         if [ ! -f android/app/src/main/assets/public/css/mobile.css ]; then
