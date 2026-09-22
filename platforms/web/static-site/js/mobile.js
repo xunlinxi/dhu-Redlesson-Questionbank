@@ -76,6 +76,7 @@ function createMobileMenu() {
 function initDraggableMenu(btn) {
     var gesture = null;
     var suppressClick = false;
+    var userPositioned = false;
     var storageKey = 'mobileMenuBtnPos';
 
     function place(x, y) {
@@ -105,11 +106,11 @@ function initDraggableMenu(btn) {
 
     try {
         var saved = JSON.parse(localStorage.getItem(storageKey));
-        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) place(saved.x, saved.y);
+        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) { userPositioned = true; place(saved.x, saved.y); }
     } catch (_) { /* Ignore invalid or unavailable stored preferences. */ }
 
     btn.addEventListener('pointerdown', function(event) {
-        if (!event.isPrimary || event.button !== 0 || window.innerWidth > 768) return;
+        if (!event.isPrimary || event.button !== 0 || (window.innerWidth > 768 && !document.body.classList.contains('practice-focused'))) return;
         var rect = btn.getBoundingClientRect();
         gesture = {id: event.pointerId, x: event.clientX, y: event.clientY,
             left: rect.left, top: rect.top, moved: false};
@@ -135,7 +136,7 @@ function initDraggableMenu(btn) {
         const touchRelease = event.type === 'pointerup' && event.pointerType === 'touch';
         suppressClick = event.type === 'pointerup' && (gesture.moved || touchRelease);
         if (touchRelease && !gesture.moved) toggleMobileMenu();
-        if (gesture.moved) savePosition();
+        if (gesture.moved) { userPositioned = true; savePosition(); }
         gesture = null;
         btn.classList.remove('dragging');
         // Pointer capture releases automatically after pointerup/cancel.
@@ -154,7 +155,7 @@ function initDraggableMenu(btn) {
 
     function positionMobileMenu() {
         const nav = document.querySelector('.nav-links');
-        if (!nav || !nav.classList.contains('is-open') || window.innerWidth > 768) return;
+        if (!nav || !nav.classList.contains('is-open') || (window.innerWidth > 768 && !document.body.classList.contains('practice-focused'))) return;
         const rect = btn.getBoundingClientRect();
         const viewport = window.visualViewport;
         const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
@@ -167,14 +168,30 @@ function initDraggableMenu(btn) {
     }
     window.positionMobileMenu = positionMobileMenu;
     window.resetMobileMenuPosition = function() {
+        userPositioned = false;
         btn.classList.remove('menu-positioned');
         btn.style.removeProperty('--menu-x'); btn.style.removeProperty('--menu-y');
         try { localStorage.removeItem(storageKey); } catch (_) {}
         closeMobileNav();
+        keepInView();
     };
 
     function keepInView() {
-        if (window.innerWidth > 768) { closeMobileNav(); return; }
+        if (gesture) return;
+        if (!userPositioned) {
+            const dock = document.getElementById('practice-nav-dock');
+            if (document.body.classList.contains('practice-focused') && dock?.getClientRects().length) {
+                const target = dock.getBoundingClientRect();
+                const size = btn.getBoundingClientRect();
+                place(target.left + (target.width-size.width)/2, target.top + (target.height-size.height)/2);
+            } else {
+                btn.classList.remove('menu-positioned');
+                btn.style.removeProperty('--menu-x');btn.style.removeProperty('--menu-y');
+                positionMobileMenu();
+            }
+            return;
+        }
+        if ((window.innerWidth > 768 && !document.body.classList.contains('practice-focused'))) { closeMobileNav(); return; }
         if (!btn.classList.contains('menu-positioned') && !document.body.classList.contains('practice-focused')) { positionMobileMenu(); return; }
         var rect = btn.getBoundingClientRect();
         place(rect.left, rect.top);

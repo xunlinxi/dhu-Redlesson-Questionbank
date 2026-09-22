@@ -246,6 +246,7 @@ B. 选项二
                         <button class="btn btn-secondary btn-small" onclick="saveCurrentProgress()" title="保存进度">
                             <i class="fas fa-save"></i> 保存
                         </button>
+                        <span id="practice-nav-dock" class="practice-nav-dock" aria-hidden="true"></span>
                     </div>
                 </div>
 
@@ -341,7 +342,7 @@ B. 选项二
                                     <span class="question-id-badge" id="question-id" title="题目编号">#000000000</span>
                                     <span class="question-chapter" id="question-chapter">第一章</span>
                                 </div>
-                                <div id="question-scroll" class="question-scroll" tabindex="0" role="region" aria-label="题干与选项"><div class="question-content" id="question-content"></div>
+                                <div id="question-stage" class="question-stage" role="region" aria-label="题干与选项"><div class="question-content" id="question-content"></div>
                                 <div class="options-list" id="options-list"></div>
                                 <div class="answer-result" id="answer-result" style="display: none;"></div></div>
                             </div>

@@ -247,6 +247,8 @@ function switchPage(page) {
     if (currentPage === 'practice' && page !== 'practice') pausePracticeSession();
     closeQuestionNavigator();
     document.body.classList.remove('practice-focused', 'practice-configuring');
+    document.documentElement.classList.remove('practice-focused');
+    window.keepMobileMenuInView?.();
     document.querySelectorAll('.nav-link').forEach(item => {
         item.classList.toggle('active', item.dataset.page === page);
     });
@@ -1027,6 +1029,8 @@ async function updateAvailableStats() { return refreshPracticeAvailability(); }
 function showPracticeSettings() {
     if (sessionActive) { showActivePractice(); resumePracticeSession(); return; }
     document.body.classList.remove('practice-focused');
+    document.documentElement.classList.remove('practice-focused');
+    window.keepMobileMenuInView?.();
     document.body.classList.toggle('practice-configuring', currentPage === 'practice');
     updateDraftBanner();
     document.getElementById('practice-title').textContent = '刷题练习';
@@ -1310,6 +1314,7 @@ function renderQuestion() {
     document.getElementById('question-type').className = 'question-type ' + getTypeClass(question.type);
     document.getElementById('question-id').textContent = `#${question.id}`;
     document.getElementById('question-chapter').textContent = question.chapter;
+    document.getElementById('question-chapter').title = question.chapter || '';
     
     // 设置题目内容，自适应文本大小
     const contentEl = document.getElementById('question-content');
@@ -1625,6 +1630,8 @@ function showPracticeResult() {
     practiceFinished = true;
     sessionActive = false;
     document.body.classList.remove('practice-focused');
+    document.documentElement.classList.remove('practice-focused');
+    window.keepMobileMenuInView?.();
     closeQuestionNavigator();
     clearPracticeDraft();
     const resultTitle = document.getElementById('practice-title');

@@ -26,5 +26,8 @@ jobs:
           node --check platforms/web/frontend/js/mobile.js
           node --check platforms/web/frontend/js/modules/parser.js
           node --check platforms/web/frontend/js/modules/storage.js
+          node --check platforms/web/frontend/js/modules/practice-session.js
+          node --check platforms/web/frontend/js/modules/workspace-ui.js
           node --check platforms/electron/main.js
           node --check platforms/electron/preload.js
+          node --check platforms/electron/models/index.js

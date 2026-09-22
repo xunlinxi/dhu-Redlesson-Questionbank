@@ -2,7 +2,7 @@
 
 ## 唯一维护入口
 
-公共前端以 `platforms/web/frontend/` 为准。页面实际使用 `js/app.js`、`js/mobile.js`、`js/modules/parser.js` 和 `js/modules/storage.js`。静态站点保留自己的 `js/storage.js` 等本地存储适配文件。
+公共前端以 `platforms/web/frontend/` 为准。页面实际使用 `js/app.js`、`js/mobile.js`、`js/modules/parser.js`、`js/modules/storage.js`、`js/modules/practice-session.js` 和 `js/modules/workspace-ui.js`。静态站点保留自己的 `js/storage.js` 等本地存储适配文件。
 
 运行 `python scripts/sync_frontends.py` 将公共文件同步到 Android、Electron 和静态站点。Electron 的 Python 解析器副本也由此脚本同步。`--check` 只检查，不写文件。
 
@@ -74,3 +74,14 @@ node --check platforms/web/frontend/js/mobile.js
 `gradlew.bat --version` 确认为 Oracle JDK 25.0.4.1 / Gradle 9.2.0；`gradlew.bat help --offline --no-daemon` 工程配置通过。`assembleDebug` 停在 `SDK location not found`，需先配置本机 Android SDK 路径。由于当前项目路径包含中文，`gradle.properties` 已按 AGP 提示设置 `android.overridePathCheck=true`。
 
 Windows 局域网端口配置工具统一在 `platforms/web/scripts/setup_firewall.bat`；只有需要局域网访问时再手动以管理员身份运行，本轮未执行任何防火墙更改。
+
+
+## 答题工作区
+
+进入练习后，主答题界面固定覆盖当前浏览器可视区域，不触发浏览器的系统全屏模式。页面与题目内容都不滚动；根据实际文字换行和可用空间，先压缩留白与间距，再寻找能完整显示内容的最大字号。选项按内容所需高度和剩余空间分配高度，上一题、提交/下一题共享稳定的底部位置。极长题目在很窄、很矮的窗口下会使用更小的字号，以遵守一屏完整显示要求。
+
+`practice-session.js` 管理可视区布局、所有模式离页/后台暂停、继续练习及独立本机草稿；`workspace-ui.js` 管理动态题量、搜索分页和弹窗焦点。草稿键按 Web/静态/Android/Electron 存储模式隔离，保存题目 ID、乱序映射、未提交选择和剩余时间；恢复前校验题目仍然存在。手动存档继续走原有 API/IPC，支持可选的 `settings`、`timer_enabled` 字段。
+
+题库及错题详情每页显示 50 题，支持题干和选项搜索。手机答题卡通过工具栏弹层打开；导航默认停靠工具栏，主动拖动后保留用户位置，并避开底部操作条。答题卡等临时弹窗可以单独滚动，不影响无滚动的主答题界面。
+
+页尾复用本地 `img/deco/deco_fence.svg` 横向平铺，桌面 85px、手机 48px。进入答题模式隐藏页尾，结束或离页后恢复。

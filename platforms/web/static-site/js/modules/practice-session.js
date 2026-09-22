@@ -72,6 +72,8 @@ function showActivePractice() {
     document.getElementById('score-info').style.display = isExamMode ? 'none' : 'flex';
     document.getElementById('timer-display').style.display = sessionTimerEnabled ? 'flex' : 'none';
     document.body.classList.add('practice-focused');
+    document.documentElement.classList.add('practice-focused');
+    if (typeof createMobileMenu === 'function') createMobileMenu();
     document.body.classList.remove('practice-configuring');
     window.scrollTo({top:0, behavior:'instant'});
     updateTimerDisplay();
@@ -135,6 +137,8 @@ function discardActivePractice() {
     practiceTimer = null; practiceQuestions = []; questionResults = []; selectedAnswers = [];
     currentProgressId = null; practiceFinishing = null; practiceFinished = false;
     document.body.classList.remove('practice-focused');
+    document.documentElement.classList.remove('practice-focused');
+    window.keepMobileMenuInView?.();
     closeQuestionNavigator(); clearPracticeDraft();
 }
 function requestEndPractice() {
@@ -182,25 +186,99 @@ async function restorePracticeSnapshot(progress, progressId) {
         showToast('练习已恢复', 'success');
     } catch(error) { showToast(error.message || '无法恢复练习，原存档已保留', 'error'); }
 }
+let lastFitSignature = '';
 function onPracticeQuestionRendered() {
-    const scroller = document.getElementById('question-scroll');
-    if (lastRenderedQuestion !== currentQuestionIndex) scroller.scrollTop = 0;
     lastRenderedQuestion = currentQuestionIndex;
+    lastFitSignature = '';
     if (sessionActive) writePracticeDraft();
-    requestAnimationFrame(layoutPracticeCard);
+    layoutPracticeCard();
 }
 let layoutQueued = false;
 function layoutPracticeCard() {
-    if (!sessionActive || currentPage!=='practice') return;
-    const area=document.getElementById('practice-area');
-    const viewport=window.visualViewport;
-    const bottom=(viewport?.offsetTop||0)+(viewport?.height||innerHeight);
-    const top=area.getBoundingClientRect().top;
-    area.style.setProperty('--practice-height', Math.max(140, bottom-top-10)+'px');
-    const card=document.getElementById('question-card');
-    const scroller=document.getElementById('question-scroll');
-    card.classList.remove('compact-question');
-    if(scroller.scrollHeight>scroller.clientHeight+1) card.classList.add('compact-question');
+    if (!sessionActive || currentPage !== 'practice') return;
+    const page = document.getElementById('practice-page');
+    const viewport = window.visualViewport;
+    const width = viewport?.width || window.innerWidth;
+    const height = viewport?.height || window.innerHeight;
+    page.style.setProperty('--workspace-width', width + 'px');
+    page.style.setProperty('--workspace-height', height + 'px');
+    page.style.setProperty('--workspace-left', (viewport?.offsetLeft || 0) + 'px');
+    page.style.setProperty('--workspace-top', (viewport?.offsetTop || 0) + 'px');
+
+    const stage = document.getElementById('question-stage');
+    const stem = document.getElementById('question-content');
+    const options = document.getElementById('options-list');
+    const buttons = [...options.querySelectorAll('.option-btn')];
+    if (!buttons.length || stage.clientHeight <= 0) return;
+    const signature = [stage.clientWidth, stage.clientHeight, window.devicePixelRatio,
+        stem.textContent, ...buttons.map(btn => btn.querySelector('.option-text')?.textContent)].join('|');
+    if (signature !== lastFitSignature) {
+        const narrow = width <= 600;
+        const baseStem = narrow ? 22 : 28;
+        const baseOption = narrow ? 18 : 22;
+        stage.classList.add('measuring-options');
+        const measure = (scale, density = 1) => {
+            // Scale all content dimensions together; never truncate or replace question text.
+            const values = {
+                '--stem-size': baseStem * scale + 'px',
+                '--option-size': baseOption * scale + 'px',
+                '--content-leading': String(1.2 + .3 * density),
+                '--content-gap': 12 * scale * density + 'px',
+                '--stage-padding': 16 * scale * density + 'px',
+                '--option-padding-y': 12 * scale * density + 'px',
+                '--option-padding-x': 16 * scale * density + 'px',
+                '--option-key-size': 28 * scale + 'px',
+                '--option-key-font': 16 * scale + 'px',
+                '--feedback-size': 18 * scale + 'px'
+            };
+            for (const [name, value] of Object.entries(values)) stage.style.setProperty(name, value);
+            const style = getComputedStyle(stage);
+            const gap = parseFloat(getComputedStyle(options).rowGap) || 0;
+            const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+            const stemHeight = stem.getBoundingClientRect().height;
+            const stemGap = parseFloat(getComputedStyle(stem).marginBottom) || 0;
+            const natural = buttons.map(btn => btn.getBoundingClientRect().height);
+            const required = padding + stemHeight + stemGap + natural.reduce((a,b)=>a+b,0) + gap * Math.max(0,buttons.length-1);
+            const fits = required <= stage.clientHeight - 1 && stem.scrollWidth <= stem.clientWidth + 1 &&
+                buttons.every(btn => btn.scrollWidth <= btn.clientWidth + 1);
+            return {fits, natural, required};
+        };
+        let scale = 1;
+        let density = 1;
+        let measured = measure(scale, density);
+        if (!measured.fits) {
+            // First spend less space on padding and gaps, keeping the preferred font.
+            density = .25;
+            measured = measure(1, density);
+            if (measured.fits) {
+                let low = .25, high = 1;
+                for (let iteration = 0; iteration < 10; iteration++) {
+                    const middle = (low + high) / 2;
+                    if (measure(1, middle).fits) low = middle;
+                    else high = middle;
+                }
+                density = low;
+            } else {
+                let low = .01, high = 1;
+                for (let iteration = 0; iteration < 13; iteration++) {
+                    const middle = (low + high) / 2;
+                    if (measure(middle, density).fits) low = middle;
+                    else high = middle;
+                }
+                scale = low;
+            }
+            measured = measure(scale, density);
+        }
+        const extra = Math.max(0, stage.clientHeight - measured.required - 1) / buttons.length;
+        buttons.forEach((btn, index) => {
+            // Extra room becomes touchable option area. Longer options keep the height they need.
+            btn.style.setProperty('--option-height', measured.natural[index] + extra + 'px');
+        });
+        stage.classList.remove('measuring-options');
+        stage.dataset.fitScale = scale.toFixed(4);
+        stage.dataset.fitDensity = density.toFixed(4);
+        lastFitSignature = signature;
+    }
     window.keepMobileMenuInView?.();
 }
 function queuePracticeLayout() {
@@ -218,18 +296,20 @@ function closeQuestionNavigator() {
 }
 function initPracticeWorkspace() {
     updateDraftBanner();
+    document.fonts?.ready.then(()=>{lastFitSignature='';queuePracticeLayout();});
     document.addEventListener('visibilitychange',()=>{
         if(document.hidden) pausePracticeSession();
         else if(currentPage==='practice' && sessionActive) resumePracticeSession();
     });
     window.addEventListener('pagehide',pausePracticeSession);
     window.addEventListener('pageshow',()=>{if(currentPage==='practice')resumePracticeSession()});
-    window.addEventListener('resize',()=>{if(innerWidth>768)closeQuestionNavigator();queuePracticeLayout()});
+    window.addEventListener('resize',queuePracticeLayout);
     window.visualViewport?.addEventListener('resize',queuePracticeLayout);
     window.visualViewport?.addEventListener('scroll',queuePracticeLayout);
     if(window.ResizeObserver) {
         const observer=new ResizeObserver(queuePracticeLayout);
         observer.observe(document.getElementById('practice-header-info'));
+        observer.observe(document.getElementById('question-stage'));
         observer.observe(document.getElementById('topNav'));
     }
 }

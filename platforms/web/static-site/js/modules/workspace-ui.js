@@ -15,6 +15,7 @@ function openAccessibleDialog(id, initialSelector) {
     const dialog=document.getElementById(id);
     dialogOrigins.set(id,document.activeElement);
     activeDialog=id;
+    document.body.classList.add('has-workspace-dialog');
     dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
     const initial=dialog.querySelector(initialSelector||'input,textarea,select,button');
     (initial || visibleDialogControls(dialog)[0] || dialog).focus();
@@ -22,6 +23,7 @@ function openAccessibleDialog(id, initialSelector) {
 function closeAccessibleDialog(id) {
     if(activeDialog!==id)return;
     activeDialog=null;
+    document.body.classList.remove('has-workspace-dialog');
     const dialog=document.getElementById(id);
     if(id==='question-nav-panel') {dialog.removeAttribute('role');dialog.removeAttribute('aria-modal');}
     const origin=dialogOrigins.get(id);

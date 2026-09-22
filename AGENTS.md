@@ -44,7 +44,7 @@ Electron Windows 打包：在 `platforms/electron/` 执行 `npm install`、`npm 
 1. 保留题库、学习记录、环境依赖及与任务无关的修改。
 2. 只修改公共前端来源，再通过同步脚本更新其他客户端。
 3. Android `frontend/` 为源码；`android/app/src/main/assets/public/` 为生成目录，不手工修改或强制加入 Git。
-4. 当前页面只加载公共 `app.js`、`mobile.js` 和 `modules/parser.js`、`modules/storage.js`；静态端另有存储适配文件。
+4. 当前页面加载公共 `app.js`、`mobile.js`，以及 `modules/` 中的 `parser.js`、`storage.js`、`practice-session.js`、`workspace-ui.js`；静态端另有存储适配文件。
 5. 清理或移动文件时同步修正引用、构建脚本、工作流和文档。
 6. 按用户要求不保留测试代码、测试样例和一次性调试脚本。使用同步检查、语法检查和实际构建作验证。
 7. DOCX/TXT 跨平台；旧 DOC 依赖 Windows、Word、pywin32。
