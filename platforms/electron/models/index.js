@@ -392,27 +392,15 @@ const ProgressModel = {
 
     saveProgress(progress) {
         const data = this.load();
-
-        const newProgress = {
-            ...progress,
-            id: progress.id || Date.now().toString(),
-            save_time: new Date().toISOString()
-        };
-
-        if (progress.id) {
-            // 更新现有进度
-            const index = data.list.findIndex(p => p.id === progress.id);
-            if (index !== -1) {
-                data.list[index] = newProgress;
-            }
-        } else {
-            // 添加新进度
-            data.list.push(newProgress);
-        }
-
+        const id = progress.progress_id || progress.id || require('crypto').randomUUID();
+        const newProgress = {...progress, id, save_time: new Date().toISOString()};
+        const list = data.list || [];
+        const index = list.findIndex(item => String(item.id) === String(id));
+        if (index >= 0) list[index] = newProgress;
+        else list.unshift(newProgress);
+        data.list = list;
         this.save(data);
-
-        return newProgress.id;
+        return id;
     },
 
     deleteProgress(id) {

@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'platforms/web/frontend'
-COMMON = ['index.html', 'css/style.css', 'css/mobile.css', 'css/cosmic.css', 'css/editorial.css',
+COMMON = ['index.html', 'css/style.css', 'css/mobile.css', 'css/cosmic.css', 'css/editorial.css', 'css/workspace.css', 'js/modules/practice-session.js', 'js/modules/workspace-ui.js', 'img/deco/deco_fence.svg',
           'js/app.js', 'js/mobile.js', 'js/modules/parser.js', 'js/modules/storage.js',
           'js/lib/dexie.min.js', 'js/lib/mammoth.browser.min.js']
 STATIC_SCRIPTS = '''    <script src="js/lib/mammoth.browser.min.js"></script>
@@ -28,7 +28,7 @@ def outputs():
     for platform in ['android', 'electron']:
         for relative in COMMON:
             yield ROOT / f'platforms/{platform}/frontend' / relative, (SOURCE / relative).read_bytes()
-    for relative in ['css/style.css', 'css/mobile.css', 'css/cosmic.css', 'css/editorial.css', 'js/app.js', 'js/mobile.js', 'js/modules/parser.js', 'js/lib/mammoth.browser.min.js']:
+    for relative in ['css/style.css', 'css/mobile.css', 'css/cosmic.css', 'css/editorial.css', 'css/workspace.css', 'js/modules/practice-session.js', 'js/modules/workspace-ui.js', 'img/deco/deco_fence.svg', 'js/app.js', 'js/mobile.js', 'js/modules/parser.js', 'js/lib/mammoth.browser.min.js']:
         yield ROOT / 'platforms/web/static-site' / relative, (SOURCE / relative).read_bytes()
     html = (SOURCE / 'index.html').read_text(encoding='utf-8')
     start = html.index('    <script src="js/lib/mammoth')

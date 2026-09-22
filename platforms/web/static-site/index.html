@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="css/mobile.css">
     <link rel="stylesheet" href="css/cosmic.css">
     <link rel="stylesheet" href="css/editorial.css">
+    <link rel="stylesheet" href="css/workspace.css">
     <meta name="theme-color" content="#091c29">
     <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
 </head>
@@ -215,7 +216,8 @@ B. 选项二
                                 背题模式
                             </label>
                         </div>
-                        <div class="question-list" id="question-list"></div>
+                        <label class="search-field" for="question-search">搜索题干或选项<input id="question-search" type="search" placeholder="输入关键词" autocomplete="off"></label>
+                        <div class="question-list" id="question-list"></div><div class="question-pagination" id="question-pagination"></div>
                     </div>
                 </div>
             </div>
@@ -239,12 +241,15 @@ B. 选项二
                             <span class="correct-count"><i class="fas fa-check"></i> <span id="correct-num">0</span></span>
                             <span class="wrong-count"><i class="fas fa-times"></i> <span id="wrong-num">0</span></span>
                         </div>
+                        <button class="btn btn-secondary btn-small mobile-answer-card" onclick="openQuestionNavigator()" aria-haspopup="dialog">答题卡</button>
+                        <button class="btn btn-ghost btn-small" onclick="requestEndPractice()">结束</button>
                         <button class="btn btn-secondary btn-small" onclick="saveCurrentProgress()" title="保存进度">
                             <i class="fas fa-save"></i> 保存
                         </button>
                     </div>
                 </div>
 
+                <div id="practice-draft-banner" class="draft-banner" hidden><div><strong>继续上次练习</strong><p id="practice-draft-summary"></p></div><div><button class="btn btn-primary" onclick="restorePracticeDraft()">继续练习</button><button class="btn btn-ghost" onclick="requestDiscardDraft()">放弃草稿</button></div></div>
                 <div class="practice-layout">
                     <div class="practice-main">
                         <div class="practice-settings" id="practice-settings">
@@ -320,7 +325,9 @@ B. 选项二
                                     <input type="text" id="player-name" class="form-control" placeholder="输入名字记录成绩" value="匿名">
                                 </div>
                             </div>
-                            <div class="practice-start-btn">
+                            <details class="practice-advanced" id="practice-advanced"><summary>更多设置 · 章节、限时与昵称</summary></details>
+                            <p id="quantity-feedback" role="status"></p>
+                            <div class="practice-start-btn"><strong id="practice-quantity-summary" aria-live="polite">正在读取可用题量…</strong>
                                 <button class="btn btn-primary btn-large" id="start-practice-btn" onclick="startPracticeByMode()">
                                     <i class="fas fa-play"></i> 开始刷题
                                 </button>
@@ -334,9 +341,9 @@ B. 选项二
                                     <span class="question-id-badge" id="question-id" title="题目编号">#000000000</span>
                                     <span class="question-chapter" id="question-chapter">第一章</span>
                                 </div>
-                                <div class="question-content" id="question-content"></div>
+                                <div id="question-scroll" class="question-scroll" tabindex="0" role="region" aria-label="题干与选项"><div class="question-content" id="question-content"></div>
                                 <div class="options-list" id="options-list"></div>
-                                <div class="answer-result" id="answer-result" style="display: none;"></div>
+                                <div class="answer-result" id="answer-result" style="display: none;"></div></div>
                             </div>
                             <div class="practice-actions">
                                 <button class="btn btn-secondary" id="prev-btn" onclick="prevQuestion()" disabled>
@@ -417,9 +424,9 @@ B. 选项二
                                 </div>
                             </div>
                         </div>
-                        <div class="side-panel collapsible-panel" id="question-nav-panel" style="display: none;">
+                        <div class="side-panel collapsible-panel" id="question-nav-panel" tabindex="-1" aria-label="答题卡" style="display: none;">
                             <div class="panel-header" onclick="togglePanel('question-nav-panel')">
-                                <span><i class="fas fa-th"></i> 答题卡</span>
+                                <span><i class="fas fa-th"></i> 答题卡</span><button id="close-question-nav" class="btn btn-ghost" onclick="event.stopPropagation();closeQuestionNavigator()" aria-label="关闭答题卡">关闭</button>
                                 <div class="panel-header-right">
                                     <span class="nav-stats"><span id="answered-count">0</span>/<span id="nav-total">0</span></span>
                                     <i class="fas fa-chevron-down toggle-icon"></i>
@@ -452,7 +459,9 @@ B. 选项二
                                 <i class="fas fa-trash"></i> 清空此题库错题
                             </button>
                         </div>
-                        <div class="question-list" id="wrong-question-list"></div>
+                        <div class="filter-bar"><select id="wrong-filter-type" aria-label="错题类型"><option value="">全部类型</option><option value="single">单选题</option><option value="multi">多选题</option><option value="judge">判断题</option></select><select id="wrong-filter-chapter" aria-label="错题章节"><option value="">全部章节</option></select></div>
+                        <label class="search-field" for="wrong-search">搜索错题题干或选项<input id="wrong-search" type="search" placeholder="输入关键词" autocomplete="off"></label>
+                        <div class="question-list" id="wrong-question-list"></div><div class="question-pagination" id="wrong-pagination"></div>
                     </div>
                 </div>
             </div>
@@ -463,25 +472,26 @@ B. 选项二
 
     <div class="toast-container" id="toast-container"></div>
 
+            <div class="footer-fence" aria-hidden="true"></div>
             <footer class="study-footer">
                 <div><strong>炸红题库</strong><span>DHU / 每一小步，都算数。</span></div>
                 <button class="btn btn-ghost" onclick="window.scrollTo({top:0,behavior:'smooth'})">回到顶部 ↑</button>
             </footer>
 
-        <div class="modal" id="confirm-modal">
+        <div class="modal" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message" tabindex="-1">
         <div class="modal-content">
             <h3 id="confirm-title">确认</h3>
             <p id="confirm-message">确定要执行此操作吗？</p>
             <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+                <button class="btn btn-secondary" id="confirm-cancel" onclick="closeModal()">取消</button>
                 <button class="btn btn-danger" id="confirm-btn">确定</button>
             </div>
         </div>
     </div>
 
-    <div class="modal" id="edit-modal">
+    <div class="modal" id="edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-dialog-title" tabindex="-1">
         <div class="modal-content modal-large">
-            <h3>编辑题目</h3>
+            <h3 id="edit-dialog-title">编辑题目</h3>
             <div class="edit-form">
                 <div class="form-group">
                     <label>题目内容</label>
@@ -523,6 +533,8 @@ B. 选项二
     <script src="js/progress.js"></script>
     <script src="js/static-adapter.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/modules/workspace-ui.js"></script>
+    <script src="js/modules/practice-session.js"></script>
     <script src="js/mobile.js"></script>
 
     <button aria-label="打开导航菜单" aria-expanded="false" aria-controls="primary-navigation" class="gnav-menu-btn" id="gnavMenuBtn" onclick="toggleMobileMenu()">

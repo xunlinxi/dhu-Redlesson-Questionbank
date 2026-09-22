@@ -21,7 +21,6 @@ let practiceTimer = null;
 let practiceFinishing = null;
 let practiceFinished = false;
 let remainingTime = 0;
-let practiceStartTime = null;
 let isExamMode = false;  // 模拟考试模式
 let questionResults = []; // 存储每道题的作答结果
 let lastPracticeSettings = null; // 保存上次练习设置
@@ -30,7 +29,6 @@ let editOptionsState = []; // 编辑弹窗中当前的选项列表
 let currentPracticeMode = 'random'; // 当前做题模式：random/exam/sequence/wrong
 let currentWrongBankName = ''; // 错题本当前题库
 let currentProgressId = null; // 当前进度ID（用于覆盖保存）
-let loadedElapsedTime = 0; // 读取存档时已经过的时间（秒）
 let navCurrentPage = 1; // 答题卡当前页码
 const NAV_PAGE_SIZE = 56; // 答题卡每页显示数量
 
@@ -54,6 +52,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     initPageLoader();
     initNavigation();
     initUpload();
+    initWorkspaceControls();
+    initPracticeWorkspace();
     document.querySelectorAll('[role="button"]').forEach(element => {
         element.addEventListener('keydown', event => {
             if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); element.click(); }
@@ -142,7 +142,7 @@ async function checkServerHealth() {
 function reloadPageData(page) {
     if (page === 'practice') {
         const practiceArea = document.getElementById('practice-area');
-        const practiceActive = practiceQuestions.length > 0 && practiceArea && practiceArea.style.display === 'block';
+        const practiceActive = sessionActive;
         if (practiceActive) {
             // 练习进行中：只刷新侧栏数据，不触碰答题区
             loadRankings();
@@ -176,11 +176,7 @@ function reloadPageData(page) {
 }
 
 // 恢复因服务器离线而暂停的答题计时器
-function resumePausedTimer() {
-    if (practiceQuestions.length > 0 && remainingTime > 0 && !practiceTimer) {
-        practiceTimer = setInterval(updateTimer, 1000);
-    }
-}
+function resumePausedTimer() { resumePracticeSession(); }
 
 function handleServerOffline() {
     if (serverOnline) {
@@ -189,11 +185,7 @@ function handleServerOffline() {
         showToast('服务器连接已断开，请检查后端服务是否运行', 'error');
         
         // 如果正在刷题，暂停计时器
-        if (practiceTimer) {
-            clearInterval(practiceTimer);
-            practiceTimer = null;
-            showToast('答题计时已暂停', 'warning');
-        }
+        pausePracticeSession();
     }
 }
 
@@ -252,6 +244,9 @@ function toggleMobileNav() { toggleMobileMenu(); }
 function closeMobileNav() { setMobileNavOpen(false); }
 
 function switchPage(page) {
+    if (currentPage === 'practice' && page !== 'practice') pausePracticeSession();
+    closeQuestionNavigator();
+    document.body.classList.remove('practice-focused', 'practice-configuring');
     document.querySelectorAll('.nav-link').forEach(item => {
         item.classList.toggle('active', item.dataset.page === page);
     });
@@ -286,8 +281,9 @@ function switchPage(page) {
             loadWrongBanks();
             break;
         case 'practice':
-            loadPracticeOptions();
-            showPracticeSettings();
+            if (sessionActive) {
+                showActivePractice(); renderQuestion(); resumePracticeSession();
+            } else { loadPracticeOptions(); showPracticeSettings(); }
             loadRankings();
             loadProgressList();
             break;
@@ -745,6 +741,7 @@ async function loadQuestions() {
         data = await window.storageService.getQuestions(filters);
         
         const questionList = document.getElementById('question-list');
+        if (data.success) data.questions = paginateQuestions(data.questions || [], 'questions');
         
         if (data.success && data.questions.length > 0) {
             questionList.innerHTML = data.questions.map((q, index) => {
@@ -775,7 +772,7 @@ async function loadQuestions() {
                         <span class="question-id-badge" title="题目编号">#${q.id}</span>
                         <span class="question-chapter">${escapeHtml(q.chapter)}</span>
                     </div>
-                    <div class="question-content">${index + 1}. ${escapeHtml(q.question)}</div>
+                    <div class="question-content">${listingState.questions.offset + index + 1}. ${escapeHtml(q.question)}</div>
                     <div class="question-options">
                         ${visibleOptions.map(([key, value]) => `
                             <div class="option-item">${key}. ${escapeHtml(value)}</div>
@@ -867,6 +864,7 @@ async function editQuestion(questionId) {
             renderEditOptions();
             
             document.getElementById('edit-modal').classList.add('show');
+            openAccessibleDialog('edit-modal', '#edit-question');
         }
     } catch (error) {
         showToast('加载题目失败', 'error');
@@ -875,6 +873,7 @@ async function editQuestion(questionId) {
 
 function closeEditModal() {
     document.getElementById('edit-modal').classList.remove('show');
+    closeAccessibleDialog('edit-modal');
     editingQuestionId = null;
     editOptionsState = [];
 }
@@ -977,7 +976,7 @@ async function loadPracticeOptions() {
         // 绑定题库选择事件
         select.onchange = () => {
             loadPracticeChapters();
-            if (currentPracticeMode === 'wrong') {
+            if (document.getElementById('practice-mode').value === 'wrong') {
                 updateWrongQuestionStats();
             } else {
                 updateAvailableStats();
@@ -985,7 +984,7 @@ async function loadPracticeOptions() {
         };
         
         // 初始加载统计
-        if (currentPracticeMode === 'wrong') {
+        if (document.getElementById('practice-mode').value === 'wrong') {
             updateWrongQuestionStats();
         } else {
             updateAvailableStats();
@@ -1015,7 +1014,7 @@ async function loadPracticeChapters() {
     }
     
     select.onchange = function() {
-        if (currentPracticeMode === 'wrong') {
+        if (document.getElementById('practice-mode').value === 'wrong') {
             updateWrongQuestionStats();
         } else {
             updateAvailableStats();
@@ -1023,42 +1022,13 @@ async function loadPracticeChapters() {
     };
 }
 
-async function updateAvailableStats() {
-    const bank = document.getElementById('practice-bank').value;
-    const chapter = document.getElementById('practice-chapter')?.value || '';
-    
-    try {
-        let singleCount = 0;
-        let multiCount = 0;
-        let judgeCount = 0;
-        
-        const data = await window.storageService.getQuestions({
-            bank: bank,
-            chapter: chapter
-        });
-        
-        if (data.success && Array.isArray(data.questions)) {
-            data.questions.forEach(q => {
-                if (q.type === 'single') singleCount++;
-                else if (q.type === 'multi') multiCount++;
-                else if (q.type === 'judge') judgeCount++;
-            });
-        } else {
-            console.warn('updateAvailableStats: 题目数据异常', data);
-            document.getElementById('available-single').textContent = 0;
-            document.getElementById('available-multi').textContent = 0;
-            document.getElementById('available-judge').textContent = 0;
-        }
-        
-        document.getElementById('available-single').textContent = singleCount;
-        document.getElementById('available-multi').textContent = multiCount;
-        document.getElementById('available-judge').textContent = judgeCount;
-    } catch (error) {
-        console.error('更新统计失败:', error);
-    }
-}
+async function updateAvailableStats() { return refreshPracticeAvailability(); }
 
 function showPracticeSettings() {
+    if (sessionActive) { showActivePractice(); resumePracticeSession(); return; }
+    document.body.classList.remove('practice-focused');
+    document.body.classList.toggle('practice-configuring', currentPage === 'practice');
+    updateDraftBanner();
     document.getElementById('practice-title').textContent = '刷题练习';
     document.getElementById('practice-title').dataset.heading = 'PRACTICE';
     document.getElementById('practice-settings').style.display = 'flex';
@@ -1079,6 +1049,7 @@ function showPracticeSettings() {
 }
 
 async function startPractice(examMode = false) {
+    if (!await prepareNewPractice(examMode ? 'exam' : 'random')) return;
     const bank = document.getElementById('practice-bank').value;
     const chapter = document.getElementById('practice-chapter')?.value || '';
     const singleCount = parseInt(document.getElementById('practice-single-count').value) || 0;
@@ -1115,79 +1086,13 @@ async function startPractice(examMode = false) {
                 }
                 return { ...q, shuffledOptions: null, shuffledAnswer: null, reverseAnswerMap: null };
             });
-            currentQuestionIndex = 0;
-            correctCount = 0;
-            wrongCount = 0;
-            selectedAnswers = [];
-            practiceStartTime = new Date();
-            practiceFinishing = null;
-            practiceFinished = false;
-            isExamMode = examMode;
-            navCurrentPage = 1; // 重置答题卡页码
-            
-            // 重置进度相关变量（新建练习时）
-            currentProgressId = null;
-            loadedElapsedTime = 0;
-            
-            // 初始化每道题的作答结果
-            questionResults = practiceQuestions.map(() => ({
-                answered: false,
-                userAnswer: [],
-                correctAnswer: [],
-                isCorrect: null
-            }));
-            
-            document.getElementById('practice-settings').style.display = 'none';
-            document.getElementById('practice-area').style.display = 'block';
-            document.getElementById('practice-result').style.display = 'none';
-            document.getElementById('practice-header-info').style.display = 'flex';
-            document.getElementById('practice-title').style.display = 'none';
-            
-            // 显示并展开答题卡
-            const navPanel = document.getElementById('question-nav-panel');
-            navPanel.style.display = 'block';
-            navPanel.classList.remove('collapsed');
-            navPanel.classList.add('expanded');
-            
-            // 进入刷题后折叠排行榜面板
-            document.getElementById('ranking-panel-wrapper').classList.add('collapsed');
-            
-            // 设置模式标识
-            const modeBadge = document.getElementById('practice-mode-badge');
-            if (isExamMode) {
-                modeBadge.textContent = '模拟考试';
-                modeBadge.className = 'practice-mode-badge exam';
-                document.getElementById('score-info').style.display = 'none';
-            } else {
-                modeBadge.textContent = '刷题模式';
-                modeBadge.className = 'practice-mode-badge practice';
-                document.getElementById('score-info').style.display = 'flex';
-            }
-            
-            // 渲染答题卡
-            renderQuestionNav();
-            
-            // 设置计时器（先清除旧的）
-            if (practiceTimer) {
-                clearInterval(practiceTimer);
-                practiceTimer = null;
-            }
-            if (enableTimer) {
-                remainingTime = timeMinutes * 60;
-                document.getElementById('timer-display').style.display = 'flex';
-                updateTimerDisplay();
-                practiceTimer = setInterval(updateTimer, 1000);
-            } else {
-                document.getElementById('timer-display').style.display = 'none';
-            }
-            
-            renderQuestion();
+            initPracticeSession(enableTimer, timeMinutes, examMode);
         } else {
             showToast('没有找到符合条件的题目，请调整设置', 'warning');
         }
     } catch (error) {
         showToast('加载题目失败: ' + error.message, 'error');
-    }
+    } finally { finishStartingPractice(); }
 }
 
 // 用相同设置再来一次
@@ -1365,6 +1270,7 @@ function changeNavPage(page) {
 
 // 跳转到指定题目
 function goToQuestion(index) {
+    closeQuestionNavigator();
     if (index >= 0 && index < practiceQuestions.length) {
         currentQuestionIndex = index;
         renderQuestion();
@@ -1372,17 +1278,7 @@ function goToQuestion(index) {
     }
 }
 
-function updateTimer() {
-    remainingTime--;
-    updateTimerDisplay();
-    
-    if (remainingTime <= 0) {
-        clearInterval(practiceTimer);
-        practiceTimer = null;
-        showToast('时间到！', 'warning');
-        finishPractice();
-    }
-}
+function updateTimer() { tickPracticeClock(); }
 
 function updateTimerDisplay() {
     const minutes = Math.floor(remainingTime / 60);
@@ -1396,40 +1292,6 @@ function updateTimerDisplay() {
         timerDisplay.classList.add('warning');
     } else {
         timerDisplay.classList.remove('warning');
-    }
-}
-
-function applyAdaptiveTextSize(el) {
-    if (!el) return;
-    var classes = ['text-sm', 'text-xs', 'text-xxs', 'text-micro'];
-    for (var i = 0; i < classes.length; i++) {
-        el.classList.remove(classes[i]);
-    }
-    var len = (el.textContent || '').length;
-    if (len > 300) {
-        el.classList.add('text-micro');
-    } else if (len > 180) {
-        el.classList.add('text-xxs');
-    } else if (len > 100) {
-        el.classList.add('text-xs');
-    } else if (len > 50) {
-        el.classList.add('text-sm');
-    }
-}
-
-function applyAdaptiveOptionText(el) {
-    if (!el) return;
-    var classes = ['text-sm', 'text-xs', 'text-xxs'];
-    for (var i = 0; i < classes.length; i++) {
-        el.classList.remove(classes[i]);
-    }
-    var len = (el.textContent || '').length;
-    if (len > 60) {
-        el.classList.add('text-xxs');
-    } else if (len > 35) {
-        el.classList.add('text-xs');
-    } else if (len > 18) {
-        el.classList.add('text-sm');
     }
 }
 
@@ -1452,7 +1314,7 @@ function renderQuestion() {
     // 设置题目内容，自适应文本大小
     const contentEl = document.getElementById('question-content');
     contentEl.textContent = question.question;
-    applyAdaptiveTextSize(contentEl);
+
     
     // 渲染选项 — 判断题生成对/错选项
     const optionsList = document.getElementById('options-list');
@@ -1510,16 +1372,17 @@ function renderQuestion() {
             document.getElementById('next-btn').innerHTML = '下一题 <i class="fas fa-arrow-right"></i>';
         }
     } else {
+        selectedAnswers = [...(result.userAnswer || [])];
         // 刷题模式未作答：正常渲染
         optionsList.innerHTML = optionEntries.map(([key, value]) => `
-            <button class="option-btn" onclick="selectOption('${key}', ${isMultiSelect(question.type)})" data-key="${key}">
+            <button class="option-btn ${selectedAnswers.includes(key) ? 'selected' : ''}" onclick="selectOption('${key}', ${isMultiSelect(question.type)})" data-key="${key}">
                 <span class="option-key">${key}</span>
                 <span class="option-text">${escapeHtml(value)}</span>
             </button>
         `).join('');
         
         // 重置状态
-        selectedAnswers = [];
+
         document.getElementById('answer-result').style.display = 'none';
         document.getElementById('submit-btn').style.display = 'inline-flex';
         document.getElementById('next-btn').style.display = 'none';
@@ -1527,13 +1390,9 @@ function renderQuestion() {
     
     document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
     
-    var optionTextEls = document.querySelectorAll('.option-text');
-    for (var i = 0; i < optionTextEls.length; i++) {
-        applyAdaptiveOptionText(optionTextEls[i]);
-    }
-    
     // 更新导航面板
     renderQuestionNav();
+    onPracticeQuestionRendered();
 }
 
 function selectOption(key, isMulti) {
@@ -1561,7 +1420,8 @@ function selectOption(key, isMulti) {
     // 模拟考试模式：自动保存选择的答案（不判分）
     if (isExamMode) {
         saveExamAnswer();
-    }
+    } else { questionResults[currentQuestionIndex].userAnswer = [...selectedAnswers]; }
+    writePracticeDraft();
 }
 
 // 模拟考试模式：仅保存答案，不判分
@@ -1678,6 +1538,8 @@ async function submitAnswer() {
             document.getElementById('next-btn').innerHTML = '查看结果 <i class="fas fa-flag-checkered"></i>';
         }
     }
+    renderQuestionNav();
+    writePracticeDraft();
 }
 
 function prevQuestion() {
@@ -1700,6 +1562,7 @@ function nextQuestion() {
 function finishPractice() {
     if (practiceFinished) return Promise.resolve();
     if (practiceFinishing) return practiceFinishing;
+    pausePracticeSession();
     if (practiceTimer) { clearInterval(practiceTimer); practiceTimer = null; }
     practiceFinishing = (async () => {
         if (isExamMode) await calculateExamResults();
@@ -1760,6 +1623,10 @@ function arraysEqual(a, b) {
 function showPracticeResult() {
     if (practiceFinished) return;
     practiceFinished = true;
+    sessionActive = false;
+    document.body.classList.remove('practice-focused');
+    closeQuestionNavigator();
+    clearPracticeDraft();
     const resultTitle = document.getElementById('practice-title');
     resultTitle.textContent = '练习结果';
     resultTitle.dataset.heading = 'RESULTS';
@@ -1771,10 +1638,7 @@ function showPracticeResult() {
         practiceTimer = null;
     }
     
-    // 计算用时：当前会话时间 + 之前读档的时间
-    const endTime = new Date();
-    const currentSessionTime = Math.floor((endTime - practiceStartTime) / 1000); // 秒
-    const totalTimeSpent = loadedElapsedTime + currentSessionTime;
+    const totalTimeSpent = getPracticeElapsedSeconds();
     const minutes = Math.floor(totalTimeSpent / 60);
     const seconds = totalTimeSpent % 60;
     const timeDisplay = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
@@ -1800,7 +1664,6 @@ function showPracticeResult() {
     }
     
     // 重置已用时间
-    loadedElapsedTime = 0;
     
     // 渲染答题详情导航
     renderResultNav();
@@ -1975,6 +1838,7 @@ function confirmClearCache() {
                         localStorage.removeItem('quiz_rankings');
                         localStorage.removeItem('quiz_wrongbook');
                         localStorage.removeItem('quiz_progress');
+                        clearPracticeDraft();
                         localStorage.removeItem('quiz_player_name');
                         localStorage.removeItem('mobileMenuBtnPos');
                         showToast('本地缓存已清空', 'success');
@@ -2014,19 +1878,21 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
-function showConfirmModal(title, message, onConfirm) {
+function showConfirmModal(title, message, onConfirm, options = {}) {
     document.getElementById('confirm-title').textContent = title;
     document.getElementById('confirm-message').textContent = message;
+    document.getElementById('confirm-btn').textContent = options.confirmText || '确定';
+    document.getElementById('confirm-cancel').textContent = options.cancelText || '取消';
+    confirmCancelCallback = options.onCancel || null;
     document.getElementById('confirm-modal').classList.add('show');
-    
-    document.getElementById('confirm-btn').onclick = () => {
-        closeModal();
-        onConfirm();
-    };
+    openAccessibleDialog('confirm-modal', '#confirm-cancel');
+    document.getElementById('confirm-btn').onclick = () => { closeModal(false); onConfirm(); };
 }
-
-function closeModal() {
+function closeModal(cancelled = true) {
     document.getElementById('confirm-modal').classList.remove('show');
+    closeAccessibleDialog('confirm-modal');
+    const callback = confirmCancelCallback; confirmCancelCallback = null;
+    if (cancelled) callback?.();
 }
 
 function browseDataPath() {
@@ -2134,7 +2000,6 @@ function escapeAttr(text) {
 // ==================== 做题模式切换 ====================
 function onPracticeModeChange() {
     const mode = document.getElementById('practice-mode').value;
-    currentPracticeMode = mode;
     
     const shuffleQuestionsRow = document.getElementById('shuffle-questions-row');
     const startBtn = document.getElementById('start-practice-btn');
@@ -2169,45 +2034,11 @@ function onPracticeModeChange() {
 }
 
 // 更新错题数量统计
-async function updateWrongQuestionStats() {
-    try {
-        const bank = document.getElementById('practice-bank').value;
-        
-        const data = await window.storageService.getWrongbookStats();
-        
-        if (data.success) {
-            let singleCount = 0;
-            let multiCount = 0;
-            let judgeCount = 0;
-            
-            if (bank) {
-                const bankStats = data.stats[bank];
-                if (bankStats) {
-                    singleCount = bankStats.single || 0;
-                    multiCount = bankStats.multi || 0;
-                    judgeCount = bankStats.judge || 0;
-                }
-            } else {
-                Object.values(data.stats).forEach(stat => {
-                    singleCount += stat.single || 0;
-                    multiCount += stat.multi || 0;
-                    judgeCount += stat.judge || 0;
-                });
-            }
-            
-            document.getElementById('available-single').textContent = singleCount;
-            document.getElementById('available-multi').textContent = multiCount;
-            document.getElementById('available-judge').textContent = judgeCount;
-        }
-    } catch (error) {
-        console.error('更新错题统计失败:', error);
-    }
-}
+async function updateWrongQuestionStats() { return refreshPracticeAvailability(); }
 
 // 根据模式开始练习
 function startPracticeByMode() {
     const mode = document.getElementById('practice-mode').value;
-    currentPracticeMode = mode;
     
     switch (mode) {
         case 'random':
@@ -2229,6 +2060,7 @@ function startPracticeByMode() {
 
 // 顺序做题模式
 async function startSequencePractice() {
+    if (!await prepareNewPractice('sequence')) return;
     const bank = document.getElementById('practice-bank').value;
     const chapter = document.getElementById('practice-chapter')?.value || '';
     const shuffleQuestions = document.getElementById('shuffle-questions')?.checked || false;
@@ -2276,11 +2108,12 @@ async function startSequencePractice() {
         }
     } catch (error) {
         showToast('加载题目失败: ' + error.message, 'error');
-    }
+    } finally { finishStartingPractice(); }
 }
 
 // 错题练习模式
 async function startWrongPractice() {
+    if (!await prepareNewPractice('wrong')) return;
     const bank = document.getElementById('practice-bank').value;
     const singleCount = parseInt(document.getElementById('practice-single-count').value) || 0;
     const multiCount = parseInt(document.getElementById('practice-multi-count').value) || 0;
@@ -2328,79 +2161,21 @@ async function startWrongPractice() {
         }
     } catch (error) {
         showToast('加载错题失败: ' + error.message, 'error');
-    }
+    } finally { finishStartingPractice(); }
 }
 
 // 初始化练习会话（公共逻辑）
 function initPracticeSession(enableTimer, timeMinutes, examMode) {
-    currentQuestionIndex = 0;
-    correctCount = 0;
-    wrongCount = 0;
-    selectedAnswers = [];
-    practiceStartTime = new Date();
-            practiceFinishing = null;
-            practiceFinished = false;
-    isExamMode = examMode;
-    navCurrentPage = 1; // 重置答题卡页码
-    
-    // 重置进度相关变量（新建练习时）
-    currentProgressId = null;
-    loadedElapsedTime = 0;
-    
-    questionResults = practiceQuestions.map(() => ({
-        answered: false,
-        userAnswer: [],
-        correctAnswer: [],
-        isCorrect: null
-    }));
-    
-    document.getElementById('practice-settings').style.display = 'none';
-    document.getElementById('practice-area').style.display = 'block';
-    document.getElementById('practice-result').style.display = 'none';
-    document.getElementById('practice-header-info').style.display = 'flex';
-    
-    // 显示并展开答题卡
-    const navPanel = document.getElementById('question-nav-panel');
-    navPanel.style.display = 'block';
-    navPanel.classList.remove('collapsed'); // 移除折叠状态即展开
-    
-    // 进入刷题后折叠排行榜面板
-    document.getElementById('ranking-panel-wrapper').classList.add('collapsed');
-    
-    // 设置模式标识
-    const modeBadge = document.getElementById('practice-mode-badge');
-    const modeTexts = {
-        'random': '刷题模式',
-        'exam': '模拟考试',
-        'sequence': '顺序做题',
-        'wrong': '错题练习'
-    };
-    modeBadge.textContent = modeTexts[currentPracticeMode] || '刷题模式';
-    modeBadge.className = `practice-mode-badge ${currentPracticeMode}`;
-    
-    if (isExamMode) {
-        document.getElementById('score-info').style.display = 'none';
-    } else {
-        document.getElementById('score-info').style.display = 'flex';
-    }
-    
-    renderQuestionNav();
-    
-    // 设置计时器（先清除旧的）
-    if (practiceTimer) {
-        clearInterval(practiceTimer);
-        practiceTimer = null;
-    }
-    if (enableTimer) {
-        remainingTime = timeMinutes * 60;
-        document.getElementById('timer-display').style.display = 'flex';
-        updateTimerDisplay();
-        practiceTimer = setInterval(updateTimer, 1000);
-    } else {
-        document.getElementById('timer-display').style.display = 'none';
-    }
-    
-    renderQuestion();
+    currentQuestionIndex = 0; correctCount = 0; wrongCount = 0; selectedAnswers = [];
+    practiceFinishing = null; practiceFinished = false; isExamMode = examMode;
+    currentPracticeMode = lastPracticeSettings.mode;
+    navCurrentPage = 1; currentProgressId = null;
+    questionResults = practiceQuestions.map(() => ({answered:false,userAnswer:[],correctAnswer:[],isCorrect:null}));
+    const minutes = Math.max(1, Math.min(180, timeMinutes));
+    lastPracticeSettings.timeMinutes = minutes;
+    lastPracticeSettings.enableTimer = enableTimer;
+    remainingTime = enableTimer ? minutes * 60 : 0;
+    activatePracticeSession(enableTimer);
 }
 
 // ==================== 错题本功能 ====================
@@ -2469,7 +2244,7 @@ async function loadWrongQuestions(bankName) {
         
         const questionList = document.getElementById('wrong-question-list');
         
-        const list = data.wrong_questions || data.questions;
+        const list = data.success ? paginateQuestions(data.wrong_questions || data.questions || [], 'wrong') : [];
         if (data.success && list && list.length > 0) {
             questionList.innerHTML = list.map((q, index) => `
                 <div class="question-item ${getTypeClass(q.type)}">
@@ -2481,7 +2256,7 @@ async function loadWrongQuestions(bankName) {
                         <span class="question-chapter">${escapeHtml(q.chapter)}</span>
                         <span class="wrong-count-badge" style="margin-left: auto;">错${q.wrong_count || 1}次</span>
                     </div>
-                    <div class="question-content">${index + 1}. ${escapeHtml(q.question)}</div>
+                    <div class="question-content">${listingState.wrong.offset + index + 1}. ${escapeHtml(q.question)}</div>
                     <div class="question-options">
                         ${Object.entries(q.options || {}).map(([key, value]) => {
                             const isCorrect = q.answer.includes(key) ? 'correct-answer' : '';
@@ -2630,204 +2405,22 @@ async function loadProgressList() {
 }
 
 async function saveCurrentProgress() {
-    if (practiceQuestions.length === 0) {
-        showToast('当前没有进行中的练习', 'warning');
-        return;
-    }
-    
-    // 计算已用时间（当前会话时间 + 之前读档的时间）
-    const currentSessionTime = Math.floor((new Date() - practiceStartTime) / 1000);
-    const totalElapsedTime = loadedElapsedTime + currentSessionTime;
-    
-    // 只保存乱序映射信息（大幅减少存储空间）
-    // shuffleMap: { questionId: { shuffledOptions, shuffledAnswer, reverseAnswerMap } }
-    const shuffleMap = {};
-    practiceQuestions.forEach(q => {
-        if (q.shuffledOptions || q.shuffledAnswer || q.reverseAnswerMap) {
-            shuffleMap[q.id] = {
-                shuffledOptions: q.shuffledOptions,
-                shuffledAnswer: q.shuffledAnswer,
-                reverseAnswerMap: q.reverseAnswerMap
-            };
-        }
-    });
-    
-    const progressData = {
-        progress_id: currentProgressId, // 如果有ID则覆盖，否则创建新的
-        mode: currentPracticeMode,
-        bank: lastPracticeSettings?.bank || '',
-        chapter: lastPracticeSettings?.chapter || '',
-        current_index: currentQuestionIndex,
-        total: practiceQuestions.length,
-        correct: correctCount,
-        wrong: wrongCount,
-        question_ids: practiceQuestions.map(q => q.id),
-        shuffle_map: shuffleMap,  // 只保存乱序映射（替代完整 questions）
-        question_results: questionResults,
-        remaining_time: remainingTime,
-        elapsed_time: totalElapsedTime  // 保存已用时间
-    };
-    
+    if (!sessionActive) { showToast('当前没有进行中的练习', 'warning'); return; }
     try {
-        const data = await window.storageService.saveProgress(progressData);
-        
-        if (data.success) {
-            // 更新当前进度ID
-            if (data.id) {
-                currentProgressId = data.id;
-            } else if (data.progress && data.progress.id) {
-                // Compatible with backend API
-                currentProgressId = data.progress.id;
-            }
-            showToast('进度已保存', 'success');
-            loadProgressList();
-        } else {
-            showToast('保存失败', 'error');
-        }
-    } catch (error) {
-        showToast('保存失败: ' + error.message, 'error');
-    }
+        const data = await window.storageService.saveProgress(snapshotPractice());
+        if (!data.success) throw new Error(data.error || '保存失败');
+        currentProgressId = data.id || data.progress?.id || currentProgressId;
+        writePracticeDraft(); showToast('进度已保存', 'success'); loadProgressList();
+    } catch(error) { showToast(error.message || '保存失败', 'error'); }
 }
 
 async function loadProgress(progressId) {
     try {
         const data = await window.storageService.getProgressById(progressId);
-        
-        if (data.success && data.progress) {
-            const progress = data.progress;
-            
-            // 从 API 加载题目
-            const questionIds = progress.question_ids || [];
-            if (questionIds.length === 0) {
-                showToast('存档数据损坏：无题目信息', 'error');
-                return;
-            }
-            
-            const questionsData = await window.storageService.getQuestions();
-            
-            if (!questionsData.success || !questionsData.questions) {
-                showToast('加载题目失败', 'error');
-                return;
-            }
-            
-            const questionMap = {};
-            questionsData.questions.forEach(q => { questionMap[q.id] = q; });
-            const restoredQuestions = questionIds.map(id => questionMap[id]).filter(q => q);
-            if (restoredQuestions.length !== questionIds.length) {
-                showToast('题库已变更，存档中部分题目不存在，请重新开始练习；原存档已保留', 'warning');
-                return;
-            }
-            practiceQuestions = restoredQuestions;
-            
-            if (practiceQuestions.length === 0) {
-                showToast('进度中的题目已被删除', 'error');
-                return;
-            }
-            
-            // 应用保存的乱序映射（新格式）
-            const shuffleMap = progress.shuffle_map || {};
-            practiceQuestions = practiceQuestions.map(q => {
-                const shuffle = shuffleMap[q.id];
-                if (shuffle) {
-                    return {
-                        ...q,
-                        shuffledOptions: shuffle.shuffledOptions,
-                        shuffledAnswer: shuffle.shuffledAnswer,
-                        reverseAnswerMap: shuffle.reverseAnswerMap
-                    };
-                }
-                // 兼容旧格式：从 questions 数组获取乱序信息
-                if (progress.questions && Array.isArray(progress.questions)) {
-                    const savedQ = progress.questions.find(sq => sq.id === q.id);
-                    if (savedQ) {
-                        return {
-                            ...q,
-                            shuffledOptions: savedQ.shuffledOptions,
-                            shuffledAnswer: savedQ.shuffledAnswer,
-                            reverseAnswerMap: savedQ.reverseAnswerMap
-                        };
-                    }
-                }
-                return q;
-            });
-            
-            currentQuestionIndex = progress.current_index || 0;
-            correctCount = progress.correct || 0;
-            wrongCount = progress.wrong || 0;
-            questionResults = progress.question_results || practiceQuestions.map(() => ({
-                answered: false, userAnswer: [], correctAnswer: [], isCorrect: null
-            }));
-            currentPracticeMode = progress.mode || 'random';
-            isExamMode = progress.mode === 'exam';
-            remainingTime = progress.remaining_time || 0;
-            practiceStartTime = new Date();
-            practiceFinishing = null;
-            practiceFinished = false;
-            navCurrentPage = 1; // 重置答题卡页码
-            
-            // 恢复进度ID和已用时间（用于覆盖保存和计算总用时）
-            currentProgressId = progressId;
-            loadedElapsedTime = progress.elapsed_time || 0;
-            
-            lastPracticeSettings = {
-                bank: progress.bank,
-                chapter: progress.chapter,
-                mode: progress.mode
-            };
-            
-            // 显示练习界面
-            document.getElementById('practice-settings').style.display = 'none';
-            document.getElementById('practice-area').style.display = 'block';
-            document.getElementById('practice-result').style.display = 'none';
-            document.getElementById('practice-header-info').style.display = 'flex';
-            
-            // 显示并展开答题卡
-            const navPanel = document.getElementById('question-nav-panel');
-            navPanel.style.display = 'block';
-            navPanel.classList.remove('collapsed');
-            navPanel.classList.add('expanded');
-            
-            // 进入刷题后折叠排行榜面板
-            document.getElementById('ranking-panel-wrapper').classList.add('collapsed');
-            
-            const modeBadge = document.getElementById('practice-mode-badge');
-            const modeTexts = {
-                'random': '刷题模式',
-                'exam': '模拟考试',
-                'sequence': '顺序做题',
-                'wrong': '错题练习'
-            };
-            modeBadge.textContent = modeTexts[currentPracticeMode] || '刷题模式';
-            modeBadge.className = `practice-mode-badge ${currentPracticeMode}`;
-            
-            document.getElementById('score-info').style.display = isExamMode ? 'none' : 'flex';
-            
-            // 设置计时器（先清除旧的）
-            if (practiceTimer) {
-                clearInterval(practiceTimer);
-                practiceTimer = null;
-            }
-            if (remainingTime > 0) {
-                document.getElementById('timer-display').style.display = 'flex';
-                updateTimerDisplay();
-                practiceTimer = setInterval(updateTimer, 1000);
-            } else {
-                document.getElementById('timer-display').style.display = 'none';
-            }
-            
-            renderQuestionNav();
-            renderQuestion();
-            
-            showToast('进度已恢复', 'success');
-            
-            // 不删除进度，保留用于覆盖更新
-            loadProgressList();
-        } else {
-            showToast('加载进度失败', 'error');
-        }
-    } catch (error) {
-        showToast('加载进度失败: ' + error.message, 'error');
-    }
+        if (!data.success || !data.progress) throw new Error(data.error || '存档不存在');
+        if (!await confirmPracticeReplacement()) return;
+        await restorePracticeSnapshot(data.progress, progressId);
+    } catch(error) { showToast(error.message || '加载进度失败', 'error'); }
 }
 
 async function deleteProgress(progressId, silent = false) {

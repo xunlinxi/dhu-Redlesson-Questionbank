@@ -23,6 +23,8 @@ const Progress = {
         
         const newProgress = {
             id: progressId,
+            settings: progressData.settings || {},
+            timer_enabled: progressData.timer_enabled ?? (progressData.remaining_time > 0),
             mode: progressData.mode || 'random',
             bank: progressData.bank || '',
             chapter: progressData.chapter || '',

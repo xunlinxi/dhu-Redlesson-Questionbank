@@ -86,7 +86,10 @@ function initDraggableMenu(btn) {
         var height = viewport ? viewport.height : window.innerHeight;
         var rect = btn.getBoundingClientRect();
         x = Math.max(left + 8, Math.min(x, left + width - rect.width - 8));
-        y = Math.max(top + 8, Math.min(y, top + height - rect.height - 8));
+        const actions = document.body.classList.contains('practice-focused') ? document.querySelector('.practice-actions') : document.body.classList.contains('practice-configuring') ? document.querySelector('.practice-start-btn') : null;
+        const actionTop = actions?.getBoundingClientRect().top;
+        const lowerEdge = actionTop > top ? Math.min(top + height, actionTop - 4) : top + height;
+        y = Math.max(top + 8, Math.min(y, lowerEdge - rect.height - 8));
         btn.style.setProperty('--menu-x', x + 'px');
         btn.style.setProperty('--menu-y', y + 'px');
         btn.classList.add('menu-positioned');
@@ -172,10 +175,11 @@ function initDraggableMenu(btn) {
 
     function keepInView() {
         if (window.innerWidth > 768) { closeMobileNav(); return; }
-        if (!btn.classList.contains('menu-positioned')) { positionMobileMenu(); return; }
+        if (!btn.classList.contains('menu-positioned') && !document.body.classList.contains('practice-focused')) { positionMobileMenu(); return; }
         var rect = btn.getBoundingClientRect();
         place(rect.left, rect.top);
     }
+    window.keepMobileMenuInView = keepInView;
     window.addEventListener('resize', keepInView);
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', keepInView);
@@ -252,6 +256,8 @@ function handleRankings(url, options) {
             id: Date.now().toString(),
             name: body.name || body.player_name || '匿名',
             total: body.total || 0,
+            settings: body.settings || {},
+            timer_enabled: body.timer_enabled ?? (body.remaining_time > 0),
             correct: body.correct || 0,
             wrong: body.wrong || 0,
             accuracy: body.accuracy || 0,
@@ -408,6 +414,8 @@ function handleProgress(url, options) {
             mode: body.mode || 'random',
             current_index: body.current_index || 0,
             total: body.total || 0,
+            settings: body.settings || {},
+            timer_enabled: body.timer_enabled ?? (body.remaining_time > 0),
             correct: body.correct || 0,
             wrong: body.wrong || 0,
             elapsed_time: body.elapsed_time || 0,

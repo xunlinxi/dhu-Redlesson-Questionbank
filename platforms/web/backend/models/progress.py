@@ -46,6 +46,8 @@ class ProgressModel:
         
         progress = {
             "id": progress_id if progress_id else str(abs(hash(str(datetime.now())))),
+            "settings": progress_data.get("settings", {}),
+            "timer_enabled": progress_data.get("timer_enabled", bool(progress_data.get("remaining_time", 0))),
             "mode": progress_data.get('mode', 'random'),
             "bank": progress_data.get('bank', ''),
             "chapter": progress_data.get('chapter', ''),
